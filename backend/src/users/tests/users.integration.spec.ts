@@ -80,7 +80,7 @@ describe('Users (integration)', () => {
         it('should update the authenticated user profile', async () => {
             const payload = {
                 bio: 'Updated bio from integration test',
-                avatar_url: 'https://example.com/avatar.png',
+                avatarUrl: 'https://example.com/avatar.png',
             };
 
             const res = await request(app.getHttpServer())
@@ -90,7 +90,7 @@ describe('Users (integration)', () => {
                 .expect(200);
 
             expect(res.body).toHaveProperty('bio', payload.bio);
-            expect(res.body).toHaveProperty('avatar_url', payload.avatar_url);
+            expect(res.body).toHaveProperty('avatarUrl', payload.avatarUrl);
             expect(res.body).toHaveProperty('email', meUser.email);
         });
 

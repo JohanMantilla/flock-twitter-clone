@@ -36,7 +36,7 @@ describe('UsersController', () => {
     describe('updateMe', () => {
         it('should call usersService.updateMe with the authenticated user id', async () => {
             const user = { id: 'uuid-123' } as any;
-            const dto = { bio: 'new bio', avatar_url: 'https://example.com/avatar.png' };
+            const dto = { bio: 'new bio', avatarUrl: 'https://example.com/avatar.png' };
             const updatedUser = { id: 'uuid-123', ...dto };
             mockUsersService.updateMe.mockResolvedValue(updatedUser);
 

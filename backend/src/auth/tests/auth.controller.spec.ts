@@ -5,7 +5,6 @@ import { AuthService } from '../auth.service';
 const mockAuthService = {
     register: jest.fn(),
     login: jest.fn(),
-    resetPassword: jest.fn(),
 };
 
 const mockAuthResponse = {
@@ -13,7 +12,7 @@ const mockAuthResponse = {
         id: 'uuid-123',
         email: 'test@test.com',
         username: 'testuser',
-        display_name: 'testuser',
+        displayName: 'testuser',
     },
     token: 'mock.jwt.token',
 };

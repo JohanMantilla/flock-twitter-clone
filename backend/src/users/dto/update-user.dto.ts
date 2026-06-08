@@ -9,5 +9,5 @@ export class UpdateUserDto {
 
     @IsOptional()
     @IsString()
-    avatar_url?: string;
+    avatarUrl?: string;
 }

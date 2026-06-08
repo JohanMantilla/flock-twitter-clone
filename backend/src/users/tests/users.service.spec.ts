@@ -10,12 +10,12 @@ const mockUser = {
     email: 'test@test.com',
     password: 'hashed-password',
     username: 'testuser',
-    display_name: 'testuser',
+    displayName: 'testuser',
     bio: 'hello',
-    avatar_url: 'https://example.com/avatar.png',
+    avatarUrl: 'https://example.com/avatar.png',
     isActive: true,
-    created_at: new Date(),
-    updated_at: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
 };
 
 const mockUserRepository = {
@@ -61,7 +61,7 @@ describe('UsersService', () => {
 
     describe('updateMe', () => {
         it('should update the current user profile', async () => {
-            const dto = { bio: 'updated bio', avatar_url: 'https://example.com/new.png' };
+            const dto = { bio: 'updated bio', avatarUrl: 'https://example.com/new.png' };
             mockUserRepository.preload.mockResolvedValue({ ...mockUser, ...dto });
             mockUserRepository.save.mockResolvedValue({ ...mockUser, ...dto });
 

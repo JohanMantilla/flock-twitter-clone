@@ -44,10 +44,6 @@ export class UsersService {
     }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
-  }
-
   handleDBErrors(error: any): never {
     if (error.code === '23505') {
       if (error.detail?.includes('(email)=(')) {

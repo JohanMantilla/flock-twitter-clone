@@ -24,7 +24,7 @@ export class AuthService {
     });
 
     if (!user) return null;
-    if (!bcrypt.compareSync(password, user.password)) return null;
+    if (!(await bcrypt.compare(password, user.password))) return null;
     if (!user.isActive) throw new UnauthorizedException('User is inactive');
 
     const { password: _, ...result } = user;
@@ -51,8 +51,8 @@ export class AuthService {
       ...userData,
       email: normalizedEmail,
       username: normalizedUsername,
-      display_name: createUserDto.username,
-      password: bcrypt.hashSync(password, 10),
+      displayName: createUserDto.username,
+      password: await bcrypt.hash(password, 10),
     });
 
     try {

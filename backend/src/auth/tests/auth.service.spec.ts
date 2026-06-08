@@ -11,12 +11,12 @@ const mockUser = {
     email: 'test@test.com',
     password: bcrypt.hashSync('Password1', 10),
     username: 'testuser',
-    display_name: 'testuser',
+    displayName: 'testuser',
     bio: null,
-    avatar_url: null,
+    avatarUrl: null,
     isActive: true,
-    created_at: new Date(),
-    updated_at: new Date(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
 };
 
 const mockUserRepository = {
@@ -122,7 +122,7 @@ describe('AuthService', () => {
             expect(bcrypt.compareSync(createUserDto.password, createCall.password)).toBe(true);
         });
 
-        it('should set display_name to username by default', async () => {
+        it('should set displayName to username by default', async () => {
             mockUserRepository.findOneBy.mockResolvedValue(null);
             mockUserRepository.create.mockImplementation((dto) => dto);
             mockUserRepository.save.mockImplementation((user) => Promise.resolve(user));
@@ -130,7 +130,7 @@ describe('AuthService', () => {
             await service.register(createUserDto);
 
             const createCall = mockUserRepository.create.mock.calls[0][0];
-            expect(createCall.display_name).toBe(createUserDto.username);
+            expect(createCall.displayName).toBe(createUserDto.username);
         });
     });
 

@@ -19,20 +19,20 @@ export class User {
     @Column('text', { unique: true })
     username: string;
 
-    @Column('text', { nullable: true })
-    display_name: string;
+    @Column('text', { nullable: true, name: 'display_name' })
+    displayName: string;
 
     @Column('text', { nullable: true })
     bio: string;
 
-    @Column('text', { nullable: true })
-    avatar_url: string;
+    @Column('text', { nullable: true, name: 'avatar_url' })
+    avatarUrl: string;
 
-    @CreateDateColumn()
-    created_at: Date;
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
 
-    @UpdateDateColumn()
-    updated_at: Date;
+    @UpdateDateColumn({ name: 'updated_at' })
+    updatedAt: Date;
 
     @Column('bool', {
         default: true,
