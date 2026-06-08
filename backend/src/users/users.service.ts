@@ -1,9 +1,5 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
-
-import * as bcrypt from 'bcrypt';
-
-import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -20,12 +16,32 @@ export class UsersService {
     return this.userRepository.find();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
+  async findByUsername(username: string) {
+    const normalizedUsername = username.toLowerCase().trim();
+    const user = await this.userRepository.findOneBy({ username: normalizedUsername });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async updateMe(id: string, updateUserDto: UpdateUserDto) {
+    const user = await this.userRepository.preload({
+      id,
+      ...updateUserDto,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    try {
+      return await this.userRepository.save(user);
+    } catch (error) {
+      return this.handleDBErrors(error);
+    }
   }
 
   remove(id: number) {
@@ -34,10 +50,16 @@ export class UsersService {
 
   handleDBErrors(error: any): never {
     if (error.code === '23505') {
+      if (error.detail?.includes('(email)=(')) {
+        throw new BadRequestException('Email already in use');
+      }
+
+      if (error.detail?.includes('(username)=(')) {
+        throw new BadRequestException('Username already in use');
+      }
+
       throw new BadRequestException(error.detail);
     }
-
-    console.log(error);
 
     throw new InternalServerErrorException('Please check server logs');
   }

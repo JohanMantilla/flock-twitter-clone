@@ -33,19 +33,33 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto) {
     const { password, ...userData } = createUserDto;
+    const normalizedEmail = createUserDto.email.toLowerCase().trim();
+    const normalizedUsername = createUserDto.username.toLowerCase().trim();
 
     const existing = await this.userRepository.findOneBy({
-      email: createUserDto.email.toLowerCase(),
+      email: normalizedEmail,
     });
     if (existing) throw new BadRequestException('Email already in use');
 
+    const existingUsername = await this.userRepository.findOneBy({
+      username: normalizedUsername,
+    });
+
+    if (existingUsername) throw new BadRequestException('Username already in use');
+
     const user = this.userRepository.create({
       ...userData,
+      email: normalizedEmail,
+      username: normalizedUsername,
       display_name: createUserDto.username,
       password: bcrypt.hashSync(password, 10),
     });
 
-    await this.userRepository.save(user);
+    try {
+      await this.userRepository.save(user);
+    } catch (error) {
+      return this.handleDBErrors(error);
+    }
     const { password: _, ...userWithoutPassword } = user;
 
     return {
@@ -66,5 +80,21 @@ export class AuthService {
 
   private getJwt(payload: { id: string; email: string }) {
     return this.jwtService.sign(payload);
+  }
+
+  handleDBErrors(error: any): never {
+    if (error.code === '23505') {
+      if (error.detail?.includes('(email)=(')) {
+        throw new BadRequestException('Email already in use');
+      }
+
+      if (error.detail?.includes('(username)=(')) {
+        throw new BadRequestException('Username already in use');
+      }
+
+      throw new BadRequestException(error.detail);
+    }
+
+    throw new Error(error);
   }
 }
