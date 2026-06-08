@@ -1,3 +1,15 @@
-# Docker services will be added later
+services:
+  db:
+    image: postgres:14.3
+    restart: always
+    ports:
+      - "${DB_PORT}:5432"
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    container_name: twitterDB
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
-
+volumes:
+  postgres_data:
