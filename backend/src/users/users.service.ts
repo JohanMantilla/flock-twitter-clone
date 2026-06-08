@@ -16,28 +16,6 @@ export class UsersService {
     private readonly userRepository: Repository<User>
   ) { }
 
-  async create(createUserDto: CreateUserDto) {
-
-    try {
-      const { password, ...userData } = createUserDto;
-      const user = this.userRepository.create({
-        ...userData,
-        display_name: createUserDto.username,
-        password: bcrypt.hashSync(password, 10),
-      });
-
-      await this.userRepository.save(user);
-      const { password: _, ...userWithOutPassword } = user;
-      return {
-        ...userWithOutPassword,
-      };
-
-    } catch (error) {
-      this.handleDBErrors(error);
-    }
-
-  }
-
   findAll() {
     return this.userRepository.find();
   }
