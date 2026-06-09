@@ -125,11 +125,21 @@ describe('TweetsService', () => {
 
 
             // simulate request exceeding max limit to ensure it is clamped
-            mockQueryBuilder.getMany.mockResolvedValue(Array.from({ length: 101 }).map((_, i) => mockTweet({ id: `t${i}` })));
+            mockQueryBuilder.getMany.mockResolvedValue(
+                Array.from({ length: 51 }).map((_, i) => mockTweet({ id: `t${i}` }))
+            );
+
             const res2 = await service.getTimeline(userId, undefined, 100);
-            expect(res2.data.length).toBeLessThanOrEqual(50);
-            // ensure .take was called with take+1 (21 for default 20)
-            expect(mockQueryBuilder.take).toHaveBeenCalled();
+
+            // service should request max 50 + 1 for pagination detection
+            expect(mockQueryBuilder.take).toHaveBeenCalledWith(51);
+
+            // 51 returned => 50 data + hasMore=true
+            expect(res2.hasMore).toBe(true);
+            expect(res2.data.length).toBe(50);
+            expect(res2.nextCursor).toBeDefined();
+
+
         });
 
         it('throws BadRequestException for invalid cursor', async () => {

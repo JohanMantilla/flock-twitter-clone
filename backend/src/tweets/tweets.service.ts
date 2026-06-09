@@ -71,21 +71,23 @@ export class TweetsService {
 
         const qb = this.tweetRepository
             .createQueryBuilder('tweet')
-            .innerJoin(Follow, 'follow', 'follow.following_id = tweet.user_id')
+            .innerJoin(
+                Follow,
+                'follow',
+                'follow.following_id = tweet.user_id',
+            )
             .leftJoinAndSelect('tweet.user', 'user')
             .where('follow.follower_id = :userId', { userId })
             .orderBy('tweet.created_at', 'DESC')
-            .take(take + 1)
-            .select(['tweet', 'user.id', 'user.username', 'user.displayName', 'user.avatarUrl']);
+            .take(take + 1);
 
         if (cursor) {
-            qb.andWhere('tweet.created_at < :cursor', { cursor: new Date(cursor) });
-        } else {
-            qb.andWhere('tweet.created_at <= :now', { now: new Date() });
+            qb.andWhere('tweet.created_at < :cursor', {
+                cursor: new Date(cursor),
+            });
         }
 
         const tweets = await qb.getMany();
-
         const hasMore = tweets.length > take;
 
         if (hasMore) {
@@ -97,11 +99,22 @@ export class TweetsService {
             ? tweets[tweets.length - 1].createdAt.toISOString()
             : null;
 
+        const safeTweets = tweets.map((tweet) => ({
+            ...tweet,
+            user: {
+                id: tweet.user.id,
+                username: tweet.user.username,
+                display_name: tweet.user.displayName,
+                avatar_url: tweet.user.avatarUrl,
+            },
+        }));
+
         return {
-            data: tweets,
+            data: safeTweets,
             nextCursor,
             hasMore,
         };
+
     }
 
     handleDBErrors(error: any): never {

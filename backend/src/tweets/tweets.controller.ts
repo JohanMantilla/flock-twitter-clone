@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Query, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Query, Post, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../users/entities/user.entity';
@@ -18,7 +18,7 @@ export class TweetsController {
 
     @Delete(':id')
     @UseGuards(JwtAuthGuard)
-    remove(@Param('id') id: string, @GetUser() user: User) {
+    remove(@Param('id', ParseUUIDPipe) id: string, @GetUser() user: User) {
         return this.tweetsService.remove(id, user);
     }
 

@@ -18,34 +18,59 @@ describe('Tweets (integration)', () => {
         }).compile();
 
         app = moduleFixture.createNestApplication();
+
         app.setGlobalPrefix('api');
+
         app.useGlobalPipes(
-            new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }),
+            new ValidationPipe({
+                whitelist: true,
+                forbidNonWhitelisted: true,
+                transform: true,
+            }),
         );
 
         await app.init();
+
         dataSource = moduleFixture.get<DataSource>(DataSource);
 
-        // register userA and userB
+        await dataSource.query(`DELETE FROM follows`);
+        await dataSource.query(`DELETE FROM tweets`);
+        await dataSource.query(`DELETE FROM "user"`);
+
+        const suffix = Math.random().toString(36).substring(2, 8);
+
         const resA = await request(app.getHttpServer())
             .post('/api/auth/register')
-            .send({ email: 'tweeter@test-integration.com', password: 'Password1', username: 'tweeteruser' });
+            .send({
+                email: `a${suffix}@test.com`,
+                password: 'Password123',
+                username: `usera${suffix}`,
+            });
+
+        expect(resA.status).toBe(201);
 
         userAToken = resA.body.token;
         userAId = resA.body.user.id;
 
         const resB = await request(app.getHttpServer())
             .post('/api/auth/register')
-            .send({ email: 'follower@test-integration.com', password: 'Password1', username: 'followeruser' });
+            .send({
+                email: `b${suffix}@test.com`,
+                password: 'Password123',
+                username: `userb${suffix}`,
+            });
+
+        expect(resB.status).toBe(201);
 
         userBToken = resB.body.token;
         userBId = resB.body.user.id;
     });
 
     afterAll(async () => {
-        await dataSource.query(`DELETE FROM tweets`);
         await dataSource.query(`DELETE FROM follows`);
-        await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@test-integration.com'`);
+        await dataSource.query(`DELETE FROM tweets`);
+        await dataSource.query(`DELETE FROM "user"`);
+
         await app.close();
     });
 
@@ -204,16 +229,13 @@ describe('Tweets (integration)', () => {
 
             // cursor pagination: create 25 tweets, request limit=20
             await dataSource.query(`DELETE FROM tweets`);
-            const createPromises: Promise<any>[] = [];
+
             for (let i = 0; i < 25; i++) {
-                createPromises.push(
-                    request(app.getHttpServer())
-                        .post('/api/tweets')
-                        .set('Authorization', `Bearer ${userAToken}`)
-                        .send({ content: `tweet-${i}` }),
-                );
+                await request(app.getHttpServer())
+                    .post('/api/tweets')
+                    .set('Authorization', `Bearer ${userAToken}`)
+                    .send({ content: `tweet-${i}` });
             }
-            await Promise.all(createPromises);
 
             const page1 = await request(app.getHttpServer())
                 .get('/api/tweets/timeline?limit=20')
