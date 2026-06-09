@@ -56,6 +56,14 @@ export class TweetsService {
     async getTimeline(userId: string, cursor?: string, limit = 20): Promise<TimelineResponseDto> {
         const take = Math.min(limit, 50);
 
+        if (cursor) {
+            const parsed = new Date(cursor);
+            if (isNaN(parsed.getTime())) {
+                throw new BadRequestException('Invalid cursor');
+            }
+            cursor = parsed.toISOString();
+        }
+
         const qb = this.tweetRepository
             .createQueryBuilder('tweet')
             .innerJoin(Follow, 'follow', 'follow.following_id = tweet.user_id')
