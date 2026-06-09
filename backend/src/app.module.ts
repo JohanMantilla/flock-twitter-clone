@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigService } from '@nestjs/config';
+import { TweetsModule } from './tweets/tweets.module';
 
 @Module({
   imports: [
@@ -32,6 +33,8 @@ import { ConfigService } from '@nestjs/config';
     UsersModule,
 
     AuthModule,
+
+    TweetsModule,
 
   ],
   controllers: [],

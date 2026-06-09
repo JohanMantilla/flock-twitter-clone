@@ -1,43 +1,47 @@
-import { BeforeInsert, BeforeUpdate, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { BeforeInsert, BeforeUpdate, Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Tweet } from '../../tweets/entities/tweet.entity';
 
 @Entity()
 export class User {
 
     @PrimaryGeneratedColumn('uuid')
-    id: string;
+    id!: string;
 
     @Column('text', {
         unique: true,
     })
-    email: string;
+    email!: string;
 
     @Column('text', {
         select: false
     })
-    password: string;
+    password!: string;
 
     @Column('text', { unique: true })
-    username: string;
+    username!: string;
 
     @Column('text', { nullable: true, name: 'display_name' })
-    displayName: string;
+    displayName!: string;
 
     @Column('text', { nullable: true })
-    bio: string;
+    bio!: string;
 
     @Column('text', { nullable: true, name: 'avatar_url' })
-    avatarUrl: string;
+    avatarUrl!: string;
 
     @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+    createdAt!: Date;
 
     @UpdateDateColumn({ name: 'updated_at' })
-    updatedAt: Date;
+    updatedAt!: Date;
 
     @Column('bool', {
         default: true,
     })
-    isActive: boolean;
+    isActive!: boolean;
+
+    @OneToMany(() => Tweet, (tweet) => tweet.user)
+    tweets!: Tweet[];
 
     @BeforeInsert()
     checkFieldsBeforeInsert() {
