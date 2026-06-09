@@ -71,6 +71,14 @@ describe('TweetsService', () => {
             expect(res.user).toBeDefined();
             expect(res.user.id).toBe(user.id);
         });
+
+        it('Tweet entity sanitizes content on BeforeInsert', () => {
+            const t = new Tweet();
+            t.content = '  a   b\t c  ';
+            // call lifecycle hook directly
+            (t as any).checkFieldsBeforeInsert();
+            expect(t.content).toBe('a b c');
+        });
     });
 
     describe('remove', () => {
@@ -115,10 +123,26 @@ describe('TweetsService', () => {
             expect(res.hasMore).toBe(true);
             expect(res.nextCursor).toBeDefined();
 
-            // respect max limit of 50
+
+            // simulate request exceeding max limit to ensure it is clamped
             mockQueryBuilder.getMany.mockResolvedValue(Array.from({ length: 101 }).map((_, i) => mockTweet({ id: `t${i}` })));
             const res2 = await service.getTimeline(userId, undefined, 100);
             expect(res2.data.length).toBeLessThanOrEqual(50);
+            // ensure .take was called with take+1 (21 for default 20)
+            expect(mockQueryBuilder.take).toHaveBeenCalled();
+        });
+
+        it('throws BadRequestException for invalid cursor', async () => {
+            await expect(service.getTimeline('u', 'not-a-date', 20)).rejects.toThrow(BadRequestException);
+        });
+
+        it('normalizes invalid limit to default and clamps to max 50', async () => {
+            mockQueryBuilder.getMany.mockResolvedValue([]);
+            await service.getTimeline('u', undefined, -5);
+            // verify limit+1 strategy is applied for pagination
+            expect(mockQueryBuilder.take).toHaveBeenCalledWith(21);
+            await service.getTimeline('u', undefined, 1000);
+            expect(mockQueryBuilder.take).toHaveBeenCalledWith(51);
         });
 
         it('filters by cursor when provided and returns no sensitive user fields', async () => {

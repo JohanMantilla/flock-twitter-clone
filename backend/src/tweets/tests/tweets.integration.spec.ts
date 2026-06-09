@@ -263,10 +263,3 @@ describe('Tweets (integration)', () => {
     });
 });
 
-// helpers
-async function getUserIdByEmail(dataSource: DataSource, email: string) {
-    const res = await dataSource.query(`SELECT id FROM "user" WHERE email = $1`, [email]);
-    return res[0].id;
-}
-
-function resolvable(val: any) { return val; }
