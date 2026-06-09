@@ -54,7 +54,12 @@ export class TweetsService {
     }
 
     async getTimeline(userId: string, cursor?: string, limit = 20): Promise<TimelineResponseDto> {
-        const take = Math.min(limit, 50);
+        // normalize and validate limit
+        let limitInt = Math.floor(Number(limit));
+        if (!Number.isFinite(limitInt) || limitInt <= 0) {
+            limitInt = 20;
+        }
+        const take = Math.min(limitInt, 50);
 
         if (cursor) {
             const parsed = new Date(cursor);
@@ -80,15 +85,21 @@ export class TweetsService {
         }
 
         const tweets = await qb.getMany();
+
         const hasMore = tweets.length > take;
 
         if (hasMore) {
             tweets.pop();
         }
 
+        // ensure we never attempt to access an element when array is empty
+        const nextCursor = hasMore && tweets.length > 0
+            ? tweets[tweets.length - 1].createdAt.toISOString()
+            : null;
+
         return {
             data: tweets,
-            nextCursor: hasMore ? tweets[tweets.length - 1].createdAt.toISOString() : null,
+            nextCursor,
             hasMore,
         };
     }
