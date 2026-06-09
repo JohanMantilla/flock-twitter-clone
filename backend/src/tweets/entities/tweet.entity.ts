@@ -2,7 +2,8 @@ import { BeforeInsert, Column, CreateDateColumn, Entity, Index, JoinColumn, Many
 import { User } from '../../users/entities/user.entity';
 
 @Entity({ name: 'tweets' })
-@Index(['user', 'createdAt'])
+@Index('idx_tweets_user_id', ['user'])
+@Index('idx_tweets_created_at', ['createdAt'])
 export class Tweet {
     @PrimaryGeneratedColumn('uuid')
     id!: string;
@@ -10,10 +11,15 @@ export class Tweet {
     @Column('text')
     content!: string;
 
-    @Column('int', {
-        default: 0,
-        name: 'likes_count',
-    })
+    /**
+     * Denormalized counter for read performance.
+     * MUST be updated using transactions when implementing likes:
+     * await dataSource.transaction(async manager => {
+     *   await manager.save(like);
+     *   await manager.increment(Tweet, { id }, 'likesCount', 1);
+     * });
+     */
+    @Column({ default: 0, name: 'likes_count' })
     likesCount!: number;
 
     @ManyToOne(() => User, { eager: false, nullable: false })

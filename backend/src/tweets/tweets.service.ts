@@ -1,8 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Follow } from '../follows/entities/follow.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateTweetDto } from './dto/create-tweet.dto';
+import { TimelineResponseDto } from './dto/timeline-response.dto';
 import { Tweet } from './entities/tweet.entity';
 
 @Injectable()
@@ -49,6 +51,38 @@ export class TweetsService {
         } catch (error) {
             return this.handleDBErrors(error);
         }
+    }
+
+    async getTimeline(userId: string, cursor?: string, limit = 20): Promise<TimelineResponseDto> {
+        const take = Math.min(limit, 50);
+
+        const qb = this.tweetRepository
+            .createQueryBuilder('tweet')
+            .innerJoin(Follow, 'follow', 'follow.following_id = tweet.user_id')
+            .leftJoinAndSelect('tweet.user', 'user')
+            .where('follow.follower_id = :userId', { userId })
+            .orderBy('tweet.created_at', 'DESC')
+            .take(take + 1)
+            .select(['tweet', 'user.id', 'user.username', 'user.displayName', 'user.avatarUrl']);
+
+        if (cursor) {
+            qb.andWhere('tweet.created_at < :cursor', { cursor: new Date(cursor) });
+        } else {
+            qb.andWhere('tweet.created_at <= :now', { now: new Date() });
+        }
+
+        const tweets = await qb.getMany();
+        const hasMore = tweets.length > take;
+
+        if (hasMore) {
+            tweets.pop();
+        }
+
+        return {
+            data: tweets,
+            nextCursor: hasMore ? tweets[tweets.length - 1].createdAt.toISOString() : null,
+            hasMore,
+        };
     }
 
     handleDBErrors(error: any): never {
