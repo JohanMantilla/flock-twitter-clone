@@ -1,5 +1,6 @@
 import { BeforeInsert, BeforeUpdate, Column, CreateDateColumn, Entity, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { Tweet } from '../../tweets/entities/tweet.entity';
+import { Follow } from '../../follows/entities/follow.entity';
 
 @Entity()
 export class User {
@@ -42,6 +43,12 @@ export class User {
 
     @OneToMany(() => Tweet, (tweet) => tweet.user)
     tweets!: Tweet[];
+
+    @OneToMany(() => Follow, (follow) => follow.follower)
+    following!: Follow[];
+
+    @OneToMany(() => Follow, (follow) => follow.following)
+    followers!: Follow[];
 
     @BeforeInsert()
     checkFieldsBeforeInsert() {
