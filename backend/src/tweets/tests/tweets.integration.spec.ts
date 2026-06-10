@@ -173,50 +173,101 @@ describe('Tweets (integration)', () => {
     });
 
     describe('GET /api/tweets/timeline', () => {
-        beforeAll(async () => {
-            // ensure clean tweets
-            await dataSource.query(`DELETE FROM tweets`);
-            // userA posts 3 tweets
+        let timelineUserAToken: string;
+        let timelineUserBToken: string;
+        let timelineUserAId: string;
+        let timelineUserBId: string;
+
+        const setupTweets = async () => {
+            await dataSource.query(
+                `DELETE FROM tweets WHERE user_id = $1`,
+                [timelineUserAId],
+            );
             await request(app.getHttpServer())
                 .post('/api/tweets')
-                .set('Authorization', `Bearer ${userAToken}`)
+                .set('Authorization', `Bearer ${timelineUserAToken}`)
                 .send({ content: 't1' });
-
             await request(app.getHttpServer())
                 .post('/api/tweets')
-                .set('Authorization', `Bearer ${userAToken}`)
+                .set('Authorization', `Bearer ${timelineUserAToken}`)
                 .send({ content: 't2' });
-
             await request(app.getHttpServer())
                 .post('/api/tweets')
-                .set('Authorization', `Bearer ${userAToken}`)
+                .set('Authorization', `Bearer ${timelineUserAToken}`)
                 .send({ content: 't3' });
+        };
+
+        const ensureFollow = async () => {
+            await dataSource.query(
+                `INSERT INTO follows (id, follower_id, following_id, created_at)
+             VALUES (gen_random_uuid(), $1, $2, now())
+             ON CONFLICT DO NOTHING`,
+                [timelineUserBId, timelineUserAId],
+            );
+        };
+
+        beforeAll(async () => {
+            const suffix = Math.random().toString(36).substring(2, 8);
+
+            const resA = await request(app.getHttpServer())
+                .post('/api/auth/register')
+                .send({
+                    email: `timeline-a-${suffix}@test.com`,
+                    password: 'Password123',
+                    username: `timelinea${suffix}`,
+                });
+
+            expect(resA.status).toBe(201);
+            timelineUserAToken = resA.body.token;
+            timelineUserAId = resA.body.user.id;
+
+            const resB = await request(app.getHttpServer())
+                .post('/api/auth/register')
+                .send({
+                    email: `timeline-b-${suffix}@test.com`,
+                    password: 'Password123',
+                    username: `timelineb${suffix}`,
+                });
+
+            expect(resB.status).toBe(201);
+            timelineUserBToken = resB.body.token;
+            timelineUserBId = resB.body.user.id;
+
+            await ensureFollow();
+            await setupTweets();
         });
 
         it('200 with empty data when user follows no one', async () => {
+            const suffix = Math.random().toString(36).substring(2, 8);
+            const resC = await request(app.getHttpServer())
+                .post('/api/auth/register')
+                .send({
+                    email: `c${suffix}@test.com`,
+                    password: 'Password123',
+                    username: `userc${suffix}`,
+                });
+
             const res = await request(app.getHttpServer())
                 .get('/api/tweets/timeline')
-                .set('Authorization', `Bearer ${userBToken}`)
+                .set('Authorization', `Bearer ${resC.body.token}`)
                 .expect(200);
 
             expect(res.body).toEqual({ data: [], nextCursor: null, hasMore: false });
         });
 
-        it('timeline returns tweets only from followed users and respects pagination', async () => {
-            // insert follow: userB follows userA
-            await dataSource.query(`INSERT INTO follows (id, follower_id, following_id, created_at) VALUES (gen_random_uuid(), $1, $2, now())`, [userBId, userAId]);
+        it('returns tweets from followed users ordered DESC', async () => {
+            await ensureFollow();
+            await setupTweets();
 
             const res = await request(app.getHttpServer())
                 .get('/api/tweets/timeline')
-                .set('Authorization', `Bearer ${userBToken}`)
+                .set('Authorization', `Bearer ${timelineUserBToken}`)
                 .expect(200);
 
             expect(res.body.data.length).toBe(3);
-            // tweets are ordered DESC by created_at
             const contents = res.body.data.map((t: any) => t.content);
             expect(contents).toEqual(['t3', 't2', 't1']);
 
-            // each tweet.user only contains safe fields
             res.body.data.forEach((t: any) => {
                 expect(t.user).toHaveProperty('id');
                 expect(t.user).toHaveProperty('username');
@@ -226,20 +277,22 @@ describe('Tweets (integration)', () => {
                 expect(t.user).not.toHaveProperty('email');
                 expect(t.user).not.toHaveProperty('isActive');
             });
+        });
 
-            // cursor pagination: create 25 tweets, request limit=20
-            await dataSource.query(`DELETE FROM tweets`);
+        it('cursor pagination works correctly', async () => {
+            await ensureFollow();
+            await dataSource.query(`DELETE FROM tweets WHERE user_id = $1`, [timelineUserAId]);
 
             for (let i = 0; i < 25; i++) {
                 await request(app.getHttpServer())
                     .post('/api/tweets')
-                    .set('Authorization', `Bearer ${userAToken}`)
+                    .set('Authorization', `Bearer ${timelineUserAToken}`)
                     .send({ content: `tweet-${i}` });
             }
 
             const page1 = await request(app.getHttpServer())
                 .get('/api/tweets/timeline?limit=20')
-                .set('Authorization', `Bearer ${userBToken}`)
+                .set('Authorization', `Bearer ${timelineUserBToken}`)
                 .expect(200);
 
             expect(page1.body.hasMore).toBe(true);
@@ -247,29 +300,32 @@ describe('Tweets (integration)', () => {
 
             const page2 = await request(app.getHttpServer())
                 .get(`/api/tweets/timeline?cursor=${encodeURIComponent(page1.body.nextCursor)}`)
-                .set('Authorization', `Bearer ${userBToken}`)
+                .set('Authorization', `Bearer ${timelineUserBToken}`)
                 .expect(200);
 
             expect(page2.body.hasMore).toBe(false);
-            // 25 total -> 20 + 5
             expect(page1.body.data.length + page2.body.data.length).toBe(25);
+        });
 
-            // limit respected
+        it('respects limit param', async () => {
             const limited = await request(app.getHttpServer())
                 .get('/api/tweets/timeline?limit=5')
-                .set('Authorization', `Bearer ${userBToken}`)
+                .set('Authorization', `Bearer ${timelineUserBToken}`)
                 .expect(200);
-            expect(limited.body.data.length).toBeLessThanOrEqual(5);
 
-            // limit max 50
-            // create 60 tweets
-            await dataSource.query(`DELETE FROM tweets`);
+            expect(limited.body.data.length).toBeLessThanOrEqual(5);
+        });
+
+        it('clamps limit to max 50', async () => {
+            await ensureFollow();
+            await dataSource.query(`DELETE FROM tweets WHERE user_id = $1`, [timelineUserAId]);
+
             const p2: Promise<any>[] = [];
             for (let i = 0; i < 60; i++) {
                 p2.push(
                     request(app.getHttpServer())
                         .post('/api/tweets')
-                        .set('Authorization', `Bearer ${userAToken}`)
+                        .set('Authorization', `Bearer ${timelineUserAToken}`)
                         .send({ content: `big-${i}` }),
                 );
             }
@@ -277,11 +333,12 @@ describe('Tweets (integration)', () => {
 
             const big = await request(app.getHttpServer())
                 .get('/api/tweets/timeline?limit=100')
-                .set('Authorization', `Bearer ${userBToken}`)
+                .set('Authorization', `Bearer ${timelineUserBToken}`)
                 .expect(200);
 
             expect(big.body.data.length).toBeLessThanOrEqual(50);
         });
     });
+
 });
 
