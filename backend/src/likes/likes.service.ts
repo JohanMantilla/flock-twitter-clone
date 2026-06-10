@@ -1,9 +1,3 @@
-import { Injectable } from '@nestjs/common';
-
-@Injectable()
-export class LikesService {
-
-}
 import {
   BadRequestException,
   Injectable,
@@ -36,13 +30,20 @@ export class LikesService {
     });
     if (existing) throw new BadRequestException('Already liked this tweet');
 
-    await this.dataSource.transaction(async manager => {
-      await manager.save(Like, {
-        user_id: currentUser.id,
-        tweet_id: tweetId,
+    try {
+      await this.dataSource.transaction(async manager => {
+        await manager.save(Like, {
+          user_id: currentUser.id,
+          tweet_id: tweetId,
+        });
+        await manager.increment(Tweet, { id: tweetId }, 'likesCount', 1);
       });
-      await manager.increment(Tweet, { id: tweetId }, 'likesCount', 1);
-    });
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        throw new BadRequestException('Already liked this tweet');
+      }
+      throw error;
+    }
 
     const updated = await this.tweetRepo.findOneBy({ id: tweetId });
     return { likesCount: updated!.likesCount };
@@ -56,6 +57,11 @@ export class LikesService {
       where: { user_id: currentUser.id, tweet_id: tweetId },
     });
     if (!like) throw new BadRequestException('You have not liked this tweet');
+
+    if (tweet.likesCount <= 0) {
+      await this.likeRepo.remove(like);
+      return { likesCount: 0 };
+    }
 
     await this.dataSource.transaction(async manager => {
       await manager.remove(Like, like);
