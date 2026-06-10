@@ -3,6 +3,7 @@ import { Repository } from 'typeorm';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
+import { SearchUserDto } from './dto/search-user.dto';
 
 @Injectable()
 export class UsersService {
@@ -42,6 +43,35 @@ export class UsersService {
     } catch (error) {
       return this.handleDBErrors(error);
     }
+  }
+
+  async search(query: string): Promise<SearchUserDto[]> {
+    const sanitized = query.trim().replace(/\s+/g, ' ').substring(0, 100);
+
+    if (!sanitized) return [];
+
+    const term = `%${sanitized}%`;
+
+    const users = await this.userRepository
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.username',
+        'user.displayName',
+        'user.avatarUrl',
+      ])
+      .where('LOWER(user.username) LIKE LOWER(:term)', { term })
+      .orWhere('LOWER(user.displayName) LIKE LOWER(:term)', { term })
+      .orderBy('user.username', 'ASC')
+      .limit(20)
+      .getMany();
+
+    return users.map(user => ({
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName ?? null,
+      avatarUrl: user.avatarUrl ?? null,
+    }));
   }
 
   handleDBErrors(error: any): never {
