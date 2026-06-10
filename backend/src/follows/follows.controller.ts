@@ -1,13 +1,9 @@
-import {
-    Controller,
-    Post,
-    Delete,
-    Param,
-    Req,
-    UseGuards,
-} from '@nestjs/common';
+import { Controller, Post, Delete, Param, UseGuards, Get } from '@nestjs/common';
 import { FollowsService } from './follows.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import { User } from '../users/entities/user.entity';
+import { FollowResponseDto } from './dto/follow-response.dto';
 
 @Controller('users')
 export class FollowsController {
@@ -15,13 +11,33 @@ export class FollowsController {
 
     @Post(':username/follow')
     @UseGuards(JwtAuthGuard)
-    async follow(@Req() req: any, @Param('username') username: string) {
-        return this.followsService.follow(req.user, username);
+    follow(
+        @GetUser() currentUser: User,
+        @Param('username') username: string,
+    ) {
+        return this.followsService.follow(currentUser, username);
     }
 
     @Delete(':username/follow')
     @UseGuards(JwtAuthGuard)
-    async unfollow(@Req() req: any, @Param('username') username: string) {
-        return this.followsService.unfollow(req.user, username);
+    unfollow(
+        @GetUser() currentUser: User,
+        @Param('username') username: string,
+    ) {
+        return this.followsService.unfollow(currentUser, username);
+    }
+
+    @Get(':username/followers')
+    getFollowers(
+        @Param('username') username: string,
+    ): Promise<FollowResponseDto[]> {
+        return this.followsService.getFollowers(username);
+    }
+
+    @Get(':username/following')
+    getFollowing(
+        @Param('username') username: string,
+    ): Promise<FollowResponseDto[]> {
+        return this.followsService.getFollowing(username);
     }
 }
