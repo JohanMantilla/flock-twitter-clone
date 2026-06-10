@@ -1,5 +1,7 @@
-import { BeforeInsert, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { BeforeInsert, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Like } from '../../likes/entities/like.entity';
+
 
 @Entity({ name: 'tweets' })
 @Index('idx_tweets_user_id', ['user'])
@@ -25,6 +27,9 @@ export class Tweet {
     @ManyToOne(() => User, { eager: false, nullable: false })
     @JoinColumn({ name: 'user_id' })
     user!: User;
+
+    @OneToMany(() => Like, like => like.tweet)
+    likes!: Like[];
 
     @CreateDateColumn({ name: 'created_at' })
     createdAt!: Date;
