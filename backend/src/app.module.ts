@@ -7,6 +7,8 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigService } from '@nestjs/config';
 import { TweetsModule } from './tweets/tweets.module';
+import { FollowsModule } from './follows/follows.module';
+import { LikesModule } from './likes/likes.module';
 
 @Module({
   imports: [
@@ -35,6 +37,10 @@ import { TweetsModule } from './tweets/tweets.module';
     AuthModule,
 
     TweetsModule,
+
+    FollowsModule,
+
+    LikesModule,
 
   ],
   controllers: [],
