@@ -15,6 +15,7 @@ export class FollowsService {
         private readonly userRepo: Repository<User>,
     ) { }
 
+
     async follow(currentUser: User, targetUsername: string) {
         const targetUser = await this.userRepo.findOne({
             where: { username: targetUsername.toLowerCase() },
@@ -34,7 +35,9 @@ export class FollowsService {
             },
         });
 
-        if (existing) throw new BadRequestException('Already following this user');
+        if (existing) {
+            throw new BadRequestException('Already following this user');
+        }
 
         const follow = this.followRepo.create({
             follower_id: currentUser.id,
@@ -43,7 +46,10 @@ export class FollowsService {
 
         await this.followRepo.save(follow);
 
-        return { success: true, following: true };
+        return {
+            success: true,
+            following: true,
+        };
     }
 
     async unfollow(currentUser: User, targetUsername: string) {
@@ -54,14 +60,14 @@ export class FollowsService {
 
         if (!targetUser) throw new NotFoundException('User not found');
 
-        const existingFollow = await this.followRepo.findOne({
+        const follow = await this.followRepo.findOne({
             where: {
                 follower_id: currentUser.id,
                 following_id: targetUser.id,
             },
         });
 
-        if (!existingFollow) {
+        if (!follow) {
             throw new NotFoundException('You are not following this user');
         }
 
@@ -70,7 +76,10 @@ export class FollowsService {
             following_id: targetUser.id,
         });
 
-        return { success: true, following: false };
+        return {
+            success: true,
+            following: false,
+        };
     }
 
     async getFollowers(username: string): Promise<FollowResponseDto[]> {
