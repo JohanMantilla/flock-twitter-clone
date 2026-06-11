@@ -1,7 +1,7 @@
-import { Tweet } from '../entities/tweet.entity';
+import { SafeTweetDto } from './safe-tweet.dto';
 
 export class TimelineResponseDto {
-    data: Tweet[];
+    data: SafeTweetDto[];
     nextCursor: string | null;
     hasMore: boolean;
 }
