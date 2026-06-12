@@ -32,8 +32,8 @@ export function Sidebar() {
                             key={item.href}
                             href={href}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${active
-                                    ? 'bg-gray-100 text-gray-900 font-medium'
-                                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
+                                ? 'bg-gray-100 text-gray-900 font-medium'
+                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'
                                 }`}
                         >
                             <i className={`ti ${item.icon} text-lg`} aria-hidden="true" />
@@ -47,7 +47,7 @@ export function Sidebar() {
                 <div className="border-t border-gray-100 pt-4 mt-4">
                     <div className="flex items-center gap-3 px-2 mb-3">
                         <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-600 shrink-0">
-                            {user.username[0].toUpperCase()}
+                            {user?.username?.[0]?.toUpperCase() ?? '?'}
                         </div>
                         <div className="overflow-hidden">
                             <p className="text-sm font-medium text-gray-900 truncate">
@@ -65,6 +65,7 @@ export function Sidebar() {
                     </button>
                 </div>
             )}
+
         </aside>
     );
 }

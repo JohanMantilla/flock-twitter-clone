@@ -20,7 +20,10 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.userRepository.findOne({
       where: { email: email.toLowerCase() },
-      select: { id: true, email: true, password: true, isActive: true },
+      select: {
+        id: true, email: true, password: true, isActive: true, username: true, displayName: true, avatarUrl: true,
+        bio: true,
+      },
     });
 
     if (!user) return null;
