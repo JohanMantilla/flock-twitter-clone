@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,7 +19,11 @@ export class UsersService {
 
   async findByUsername(username: string) {
     const normalizedUsername = username.toLowerCase().trim();
-    const user = await this.userRepository.findOneBy({ username: normalizedUsername });
+    const user = await this.userRepository.find({
+      where: {
+        username: ILike(`%${normalizedUsername}%`),
+      },
+    });
 
     if (!user) {
       throw new NotFoundException('User not found');

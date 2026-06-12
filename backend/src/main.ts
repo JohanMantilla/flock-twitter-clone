@@ -9,6 +9,12 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port') ?? 3000;
 
+  app.enableCors({
+    origin: 'http://localhost:3001', // puerto de Next.js
+    credentials: true,
+  });
+
+
   app.setGlobalPrefix('api');
 
   app.useGlobalPipes(

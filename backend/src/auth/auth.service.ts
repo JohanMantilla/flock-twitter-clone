@@ -97,4 +97,24 @@ export class AuthService {
 
     throw new Error(error);
   }
+
+  async getMe(userId: string): Promise<Omit<User, 'password'>> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        displayName: true,
+        bio: true,
+        avatarUrl: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    if (!user) throw new UnauthorizedException('User not found');
+    return user;
+  }
 }
