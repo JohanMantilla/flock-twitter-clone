@@ -71,13 +71,23 @@ export class TweetsService {
 
         const qb = this.tweetRepository
             .createQueryBuilder('tweet')
-            .innerJoin(
+            .leftJoin(
                 Follow,
                 'follow',
-                'follow.following_id = tweet.user_id',
+                `
+        follow.following_id = tweet.user_id
+        AND follow.follower_id = :userId
+        `,
+                { userId },
             )
             .leftJoinAndSelect('tweet.user', 'user')
-            .where('follow.follower_id = :userId', { userId })
+            .where(
+                `
+        follow.follower_id IS NOT NULL
+        OR tweet.user_id = :userId
+        `,
+                { userId },
+            )
             .orderBy('tweet.created_at', 'DESC')
             .take(take + 1);
 
