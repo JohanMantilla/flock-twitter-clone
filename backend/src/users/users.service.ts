@@ -98,6 +98,59 @@ export class UsersService {
     }));
   }
 
+  async getUserTweets(username: string, cursor?: string, limit = 20) {
+    const user = await this.userRepository.findOne({
+      where: { username: username.toLowerCase() },
+      select: { id: true },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    let limitInt = Math.floor(Number(limit));
+    if (!Number.isFinite(limitInt) || limitInt <= 0) limitInt = 20;
+    const take = Math.min(limitInt, 50);
+
+    if (cursor) {
+      const parsed = new Date(cursor);
+      if (isNaN(parsed.getTime())) throw new BadRequestException('Invalid cursor');
+      cursor = parsed.toISOString();
+    }
+
+    const qb = this.userRepository.manager
+      .getRepository('tweets')
+      .createQueryBuilder('tweet')
+      .leftJoinAndSelect('tweet.user', 'user')
+      .where('tweet.user_id = :userId', { userId: user.id })
+      .orderBy('tweet.created_at', 'DESC')
+      .take(take + 1);
+
+    if (cursor) {
+      qb.andWhere('tweet.created_at < :cursor', { cursor: new Date(cursor) });
+    }
+
+    const tweets = await qb.getMany();
+    const hasMore = tweets.length > take;
+    if (hasMore) tweets.pop();
+
+    const nextCursor = hasMore && tweets.length > 0
+      ? tweets[tweets.length - 1].createdAt.toISOString()
+      : null;
+
+    return {
+      data: tweets.map(tweet => ({
+        ...tweet,
+        user: {
+          id: tweet.user.id,
+          username: tweet.user.username,
+          displayName: tweet.user.displayName,
+          avatarUrl: tweet.user.avatarUrl,
+        },
+      })),
+      nextCursor,
+      hasMore,
+    };
+  }
+
   handleDBErrors(error: any): never {
     if (error.code === '23505') {
       if (error.detail?.includes('(email)=(')) {

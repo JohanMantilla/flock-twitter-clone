@@ -20,6 +20,17 @@ export class UsersController {
     return this.usersService.getStats(username);
   }
 
+  @Get(':username/tweets')
+  getUserTweets(
+    @Param('username') username: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : 20;
+    const safeLimit = Number.isFinite(parsedLimit) ? parsedLimit : 20;
+    return this.usersService.getUserTweets(username, cursor, safeLimit);
+  }
+
   @Get(':username')
   findOne(@Param('username') username: string) {
     return this.usersService.findByUsername(username);
