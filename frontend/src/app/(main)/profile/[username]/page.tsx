@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { FollowButton } from '@/components/profile/FollowButton';
 import { User } from '@/types';
+import { useUserTweets } from '@/hooks/useUserTweets';
+import { TweetCard } from '@/components/tweets/TweetCard';
 
 interface Stats {
     tweetsCount: number;
@@ -33,6 +35,27 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     const [followers, setFollowers] = useState<FollowItem[]>([]);
     const [following, setFollowing] = useState<FollowItem[]>([]);
     const [loadingTab, setLoadingTab] = useState(false);
+
+    const {
+        data: tweetsData,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        isLoading: isLoadingTweets,
+    } = useUserTweets(username);
+
+    const tweets = tweetsData?.pages.flatMap(p => p.data) ?? [];
+
+    const observer = useRef<IntersectionObserver | null>(null);
+    const sentinelRef = useCallback((node: HTMLDivElement | null) => {
+        if (isFetchingNextPage) return;
+        if (observer.current) observer.current.disconnect();
+        if (!node) return;
+        observer.current = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting && hasNextPage) fetchNextPage();
+        });
+        observer.current.observe(node);
+    }, [isFetchingNextPage, hasNextPage, fetchNextPage]);
 
     useEffect(() => {
         if (!username) return;
@@ -174,9 +197,43 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 <div className="p-6 text-center text-gray-400 text-sm">Loading...</div>
             )}
 
-            {!loadingTab && activeTab === 'tweets' && (
-                <div className="p-4 text-center text-gray-400 text-sm">
-                    Tweets coming soon
+            {activeTab === 'tweets' && (
+                <div>
+                    {isLoadingTweets && (
+                        <div className="space-y-0">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="flex gap-3 px-4 py-3 border-b border-gray-100 animate-pulse">
+                                    <div className="w-10 h-10 rounded-full bg-gray-100 shrink-0" />
+                                    <div className="flex-1 space-y-2 pt-1">
+                                        <div className="h-3 bg-gray-100 rounded w-1/3" />
+                                        <div className="h-3 bg-gray-100 rounded w-full" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {!isLoadingTweets && tweets.length === 0 && (
+                        <div className="p-6 text-center text-gray-400 text-sm">
+                            No tweets yet
+                        </div>
+                    )}
+
+                    {tweets.map(tweet => (
+                        <TweetCard
+                            key={tweet.id}
+                            tweet={tweet}
+                            currentUserId={currentUser?.id}
+                        />
+                    ))}
+
+                    <div ref={sentinelRef} className="h-4" />
+
+                    {isFetchingNextPage && (
+                        <div className="px-4 py-3 text-center">
+                            <span className="text-xs text-gray-400">Loading more...</span>
+                        </div>
+                    )}
                 </div>
             )}
 
