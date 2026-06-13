@@ -114,8 +114,8 @@ export class TweetsService {
             user: {
                 id: tweet.user.id,
                 username: tweet.user.username,
-                display_name: tweet.user.displayName,
-                avatar_url: tweet.user.avatarUrl,
+                displayName: tweet.user.displayName,
+                avatarUrl: tweet.user.avatarUrl,
             },
         }));
 
