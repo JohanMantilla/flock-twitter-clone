@@ -1,15 +1,15 @@
 export class SafeTweetAuthorDto {
     id: string;
     username: string;
-    display_name: string;
-    avatar_url: string;
+    displayName: string | null;
+    avatarUrl: string | null;
 }
 
 export class SafeTweetDto {
     id: string;
     content: string;
     likesCount: number;
-    likes: any[];
+    liked: boolean;
     createdAt: Date;
     updatedAt: Date;
     user: SafeTweetAuthorDto;

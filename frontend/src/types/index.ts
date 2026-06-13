@@ -24,6 +24,7 @@ export interface Tweet {
     id: string;
     content: string;
     likesCount: number;
+    liked: boolean;
     createdAt: string;
     user: TweetUser;
 }
