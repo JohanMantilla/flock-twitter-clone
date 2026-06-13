@@ -15,6 +15,11 @@ export class UsersController {
     return this.usersService.search(q);
   }
 
+  @Get(':username/stats')
+  getStats(@Param('username') username: string) {
+    return this.usersService.getStats(username);
+  }
+
   @Get(':username')
   findOne(@Param('username') username: string) {
     return this.usersService.findByUsername(username);

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
-import { ILike, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -19,17 +19,39 @@ export class UsersService {
 
   async findByUsername(username: string) {
     const normalizedUsername = username.toLowerCase().trim();
-    const user = await this.userRepository.find({
-      where: {
-        username: ILike(`%${normalizedUsername}%`),
-      },
+    const user = await this.userRepository.findOneBy({
+      username: normalizedUsername,
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
+    if (!user) throw new NotFoundException('User not found');
     return user;
+  }
+
+  async getStats(username: string) {
+    const user = await this.userRepository.findOne({
+      where: { username: username.toLowerCase() },
+      select: { id: true },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    const [tweetsCount, followersCount, followingCount] = await Promise.all([
+      this.userRepository.query(
+        `SELECT COUNT(*) FROM tweets WHERE user_id = $1`, [user.id]
+      ),
+      this.userRepository.query(
+        `SELECT COUNT(*) FROM follows WHERE following_id = $1`, [user.id]
+      ),
+      this.userRepository.query(
+        `SELECT COUNT(*) FROM follows WHERE follower_id = $1`, [user.id]
+      ),
+    ]);
+
+    return {
+      tweetsCount: parseInt(tweetsCount[0].count),
+      followersCount: parseInt(followersCount[0].count),
+      followingCount: parseInt(followingCount[0].count),
+    };
   }
 
   async updateMe(id: string, updateUserDto: UpdateUserDto) {
@@ -38,9 +60,7 @@ export class UsersService {
       ...updateUserDto,
     });
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
+    if (!user) throw new NotFoundException('User not found');
 
     try {
       return await this.userRepository.save(user);
@@ -83,11 +103,9 @@ export class UsersService {
       if (error.detail?.includes('(email)=(')) {
         throw new BadRequestException('Email already in use');
       }
-
       if (error.detail?.includes('(username)=(')) {
         throw new BadRequestException('Username already in use');
       }
-
       throw new BadRequestException(error.detail);
     }
 
