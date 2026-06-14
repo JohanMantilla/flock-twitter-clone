@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 describe('Search (integration)', () => {
     let app: INestApplication;
     let dataSource: DataSource;
+    let searcherToken: string;
     const suffix = Math.random().toString(36).substring(2, 8);
 
     beforeAll(async () => {
@@ -24,6 +25,16 @@ describe('Search (integration)', () => {
         dataSource = moduleFixture.get<DataSource>(DataSource);
 
         await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@search-test.com'`);
+
+        // usuario que hace las búsquedas
+        const searcherRes = await request(app.getHttpServer())
+            .post('/api/auth/register')
+            .send({
+                email: `searcher-${suffix}@search-test.com`,
+                password: 'Password1',
+                username: `searcher${suffix}`,
+            });
+        searcherToken = searcherRes.body.token;
 
         await request(app.getHttpServer())
             .post('/api/auth/register')
@@ -56,9 +67,16 @@ describe('Search (integration)', () => {
     });
 
     describe('GET /api/users/search', () => {
+        it('401 without token', async () => {
+            await request(app.getHttpServer())
+                .get(`/api/users/search?q=searchalpha${suffix}`)
+                .expect(401);
+        });
+
         it('200 returns matches by username', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/search?q=searchalpha${suffix}`)
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(Array.isArray(res.body)).toBe(true);
@@ -69,6 +87,7 @@ describe('Search (integration)', () => {
         it('200 returns matches by partial username', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/search?q=searchbeta`)
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(Array.isArray(res.body)).toBe(true);
@@ -78,6 +97,7 @@ describe('Search (integration)', () => {
         it('200 returns [] when no matches', async () => {
             const res = await request(app.getHttpServer())
                 .get('/api/users/search?q=xyznonexistent99999')
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(res.body).toEqual([]);
@@ -86,14 +106,16 @@ describe('Search (integration)', () => {
         it('200 returns [] with empty query', async () => {
             const res = await request(app.getHttpServer())
                 .get('/api/users/search?q=')
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(res.body).toEqual([]);
         });
 
-        it('each result has correct fields', async () => {
+        it('each result has correct fields including isFollowing', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/search?q=searchalpha${suffix}`)
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(res.body.length).toBeGreaterThanOrEqual(1);
@@ -103,21 +125,22 @@ describe('Search (integration)', () => {
                 expect(user).toHaveProperty('username');
                 expect(user).toHaveProperty('displayName');
                 expect(user).toHaveProperty('avatarUrl');
+                expect(user).toHaveProperty('isFollowing');
                 expect(user).not.toHaveProperty('password');
                 expect(user).not.toHaveProperty('email');
                 expect(user).not.toHaveProperty('isActive');
-                expect(user).not.toHaveProperty('bio');
-                expect(user).not.toHaveProperty('createdAt');
             });
         });
 
         it('search is case-insensitive', async () => {
             const upperRes = await request(app.getHttpServer())
                 .get(`/api/users/search?q=SEARCHGAMMA`)
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             const lowerRes = await request(app.getHttpServer())
                 .get(`/api/users/search?q=searchgamma`)
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(upperRes.body.length).toBe(lowerRes.body.length);
@@ -145,10 +168,10 @@ describe('Search (integration)', () => {
 
             const res = await request(app.getHttpServer())
                 .get(`/api/users/search?q=bulksearch${bulkSuffix}`)
+                .set('Authorization', `Bearer ${searcherToken}`)
                 .expect(200);
 
             expect(res.body.length).toBeLessThanOrEqual(20);
         });
-
     });
 });

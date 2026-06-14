@@ -7,6 +7,7 @@ import { DataSource } from 'typeorm';
 describe('Users (integration)', () => {
     let app: INestApplication;
     let dataSource: DataSource;
+    let token: string;
 
     beforeAll(async () => {
         const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -66,8 +67,6 @@ describe('Users (integration)', () => {
             username: 'metestusers',
         };
 
-        let token: string;
-
         beforeAll(async () => {
             const res = await request(app.getHttpServer())
                 .post('/api/auth/register')
@@ -107,6 +106,87 @@ describe('Users (integration)', () => {
                 .set('Authorization', `Bearer ${token}`)
                 .send({ bio: 123 })
                 .expect(400);
+        });
+    });
+
+    describe('GET /api/users/search', () => {
+        const searchUser = {
+            email: 'searcher@users-integration.com',
+            password: 'Password1',
+            username: 'searchertest',
+        };
+
+        beforeAll(async () => {
+            const res = await request(app.getHttpServer())
+                .post('/api/auth/register')
+                .send(searchUser);
+            token = res.body.token;
+        });
+
+        it('should return 401 without token', async () => {
+            await request(app.getHttpServer())
+                .get('/api/users/search?q=searchertest')
+                .expect(401);
+        });
+
+        it('should return results with isFollowing field when authenticated', async () => {
+            const res = await request(app.getHttpServer())
+                .get('/api/users/search?q=searchertest')
+                .set('Authorization', `Bearer ${token}`)
+                .expect(200);
+
+            expect(Array.isArray(res.body)).toBe(true);
+            res.body.forEach((u: any) => {
+                expect(u).toHaveProperty('isFollowing');
+                expect(u).not.toHaveProperty('password');
+            });
+        });
+
+        it('should return empty array for empty query', async () => {
+            const res = await request(app.getHttpServer())
+                .get('/api/users/search?q=')
+                .set('Authorization', `Bearer ${token}`)
+                .expect(200);
+
+            expect(res.body).toEqual([]);
+        });
+    });
+
+    describe('GET /api/users/:username/stats', () => {
+        it('should return tweet, follower and following counts', async () => {
+            const res = await request(app.getHttpServer())
+                .get('/api/users/profiletest/stats')
+                .expect(200);
+
+            expect(res.body).toHaveProperty('tweetsCount');
+            expect(res.body).toHaveProperty('followersCount');
+            expect(res.body).toHaveProperty('followingCount');
+            expect(typeof res.body.tweetsCount).toBe('number');
+        });
+
+        it('should return 404 for unknown username', async () => {
+            await request(app.getHttpServer())
+                .get('/api/users/nonexistentxyz/stats')
+                .expect(404);
+        });
+    });
+
+    describe('GET /api/users/:username/tweets', () => {
+        it('should return paginated tweets for a user', async () => {
+            const res = await request(app.getHttpServer())
+                .get('/api/users/profiletest/tweets')
+                .expect(200);
+
+            expect(res.body).toHaveProperty('data');
+            expect(res.body).toHaveProperty('nextCursor');
+            expect(res.body).toHaveProperty('hasMore');
+            expect(Array.isArray(res.body.data)).toBe(true);
+        });
+
+        it('should return 404 for unknown username', async () => {
+            await request(app.getHttpServer())
+                .get('/api/users/nonexistentxyz/tweets')
+                .expect(404);
         });
     });
 });
