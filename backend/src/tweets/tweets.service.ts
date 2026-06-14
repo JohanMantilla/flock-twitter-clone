@@ -51,15 +51,41 @@ export class TweetsService {
         }
     }
 
-    async getTimeline(userId: string, cursor?: string, limit = 20): Promise<TimelineResponseDto> {
+    async getTimeline(
+        userId: string,
+        cursor?: string,
+        limit = 20,
+    ): Promise<TimelineResponseDto> {
         let limitInt = Math.floor(Number(limit));
-        if (!Number.isFinite(limitInt) || limitInt <= 0) limitInt = 20;
+
+        if (!Number.isFinite(limitInt) || limitInt <= 0) {
+            limitInt = 20;
+        }
+
         const take = Math.min(limitInt, 50);
 
+        let cursorCreatedAt: Date | null = null;
+        let cursorId: string | null = null;
+
         if (cursor) {
-            const parsed = new Date(cursor);
-            if (isNaN(parsed.getTime())) throw new BadRequestException('Invalid cursor');
-            cursor = parsed.toISOString();
+            try {
+                const decoded = JSON.parse(
+                    Buffer.from(cursor, 'base64').toString('utf8'),
+                );
+
+                cursorCreatedAt = new Date(decoded.createdAt);
+
+                if (
+                    isNaN(cursorCreatedAt.getTime()) ||
+                    typeof decoded.id !== 'string'
+                ) {
+                    throw new Error();
+                }
+
+                cursorId = decoded.id;
+            } catch {
+                throw new BadRequestException('Invalid cursor');
+            }
         }
 
         const qb = this.tweetRepository
@@ -67,35 +93,66 @@ export class TweetsService {
             .leftJoin(
                 Follow,
                 'follow',
-                `follow.following_id = tweet.user_id AND follow.follower_id = :userId`,
+                `follow.following_id = tweet.user_id
+             AND follow.follower_id = :userId`,
                 { userId },
             )
             .leftJoinAndSelect('tweet.user', 'user')
             .where(
-                `follow.follower_id IS NOT NULL OR tweet.user_id = :userId`,
+                `(follow.follower_id IS NOT NULL
+              OR tweet.user_id = :userId)`,
                 { userId },
             )
             .orderBy('tweet.created_at', 'DESC')
+            .addOrderBy('tweet.id', 'DESC')
             .take(take + 1);
 
-        if (cursor) {
-            qb.andWhere('tweet.created_at < :cursor', { cursor: new Date(cursor) });
+        if (cursorCreatedAt && cursorId) {
+            qb.andWhere(
+                `(
+                tweet.created_at < :cursorCreatedAt
+                OR (
+                    tweet.created_at = :cursorCreatedAt
+                    AND tweet.id < :cursorId
+                )
+            )`,
+                {
+                    cursorCreatedAt,
+                    cursorId,
+                },
+            );
         }
 
         const tweets = await qb.getMany();
+
         const hasMore = tweets.length > take;
-        if (hasMore) tweets.pop();
 
-        const nextCursor = hasMore && tweets.length > 0
-            ? tweets[tweets.length - 1].createdAt.toISOString()
-            : null;
+        if (hasMore) {
+            tweets.pop();
+        }
 
-        // query raw para evitar problemas de mapeo de TypeORM
-        const likedRows: { tweet_id: string }[] = await this.likeRepo.query(
-            `SELECT tweet_id FROM likes WHERE user_id = $1`,
-            [userId]
+        const nextCursor =
+            hasMore && tweets.length > 0
+                ? Buffer.from(
+                    JSON.stringify({
+                        createdAt:
+                            tweets[tweets.length - 1].createdAt.toISOString(),
+                        id: tweets[tweets.length - 1].id,
+                    }),
+                ).toString('base64')
+                : null;
+
+        const likedRows: { tweet_id: string }[] =
+            await this.likeRepo.query(
+                `SELECT tweet_id
+             FROM likes
+             WHERE user_id = $1`,
+                [userId],
+            );
+
+        const likedTweetIds = new Set(
+            likedRows.map((l) => l.tweet_id),
         );
-        const likedTweetIds = new Set<string>(likedRows.map(l => l.tweet_id));
 
         const safeTweets = tweets.map((tweet) => ({
             ...tweet,
@@ -108,7 +165,11 @@ export class TweetsService {
             },
         }));
 
-        return { data: safeTweets, nextCursor, hasMore };
+        return {
+            data: safeTweets,
+            nextCursor,
+            hasMore,
+        };
     }
 
     handleDBErrors(error: any): never {

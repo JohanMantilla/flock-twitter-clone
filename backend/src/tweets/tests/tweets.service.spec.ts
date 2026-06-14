@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TweetsService } from '../tweets.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Tweet } from '../entities/tweet.entity';
+import { Like } from '../../likes/entities/like.entity';
 import { User } from '../../users/entities/user.entity';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
@@ -20,10 +21,12 @@ describe('TweetsService', () => {
 
     const mockQueryBuilder = {
         innerJoin: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
         leftJoinAndSelect: jest.fn().mockReturnThis(),
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
         orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
         select: jest.fn().mockReturnThis(),
         getMany: jest.fn(),
@@ -38,27 +41,35 @@ describe('TweetsService', () => {
         createQueryBuilder: jest.fn(() => mockQueryBuilder),
     };
 
+    const mockLikeRepository = {
+        query: jest.fn().mockResolvedValue([]),
+    };
+
     beforeEach(async () => {
         const module: TestingModule = await Test.createTestingModule({
             providers: [
                 TweetsService,
                 { provide: getRepositoryToken(Tweet), useValue: mockTweetRepository },
+                { provide: getRepositoryToken(Like), useValue: mockLikeRepository },
             ],
         }).compile();
 
         service = module.get<TweetsService>(TweetsService);
         jest.clearAllMocks();
+        mockLikeRepository.query.mockResolvedValue([]);
     });
 
     describe('create', () => {
         it('creates tweet with likes_count = 0 and sanitizes content and associates user', async () => {
             const user = { id: 'user-1' } as User;
             const dto = { content: '  hello   world\t' } as any;
-
             const created = mockTweet({ content: 'hello world', user });
 
             mockTweetRepository.create.mockReturnValue({ ...dto, user });
-            mockTweetRepository.save.mockResolvedValue({ id: 'tweet-uuid', ...dto, user, createdAt: new Date(), updatedAt: new Date(), likesCount: 0 });
+            mockTweetRepository.save.mockResolvedValue({
+                id: 'tweet-uuid', ...dto, user,
+                createdAt: new Date(), updatedAt: new Date(), likesCount: 0,
+            });
             mockTweetRepository.findOneOrFail.mockResolvedValue(created);
 
             const res = await service.create(user, dto);
@@ -75,7 +86,6 @@ describe('TweetsService', () => {
         it('Tweet entity sanitizes content on BeforeInsert', () => {
             const t = new Tweet();
             t.content = '  a   b\t c  ';
-            // call lifecycle hook directly
             (t as any).checkFieldsBeforeInsert();
             expect(t.content).toBe('a b c');
         });
@@ -107,12 +117,12 @@ describe('TweetsService', () => {
     });
 
     describe('getTimeline', () => {
-        it('returns data, nextCursor and hasMore, respects limit max 50 and cursor filtering', async () => {
+        it('returns data, nextCursor and hasMore', async () => {
             const userId = 'follower-1';
-
             const now = new Date();
-            // create 21 tweets to trigger hasMore when limit=20
-            const tweets = Array.from({ length: 21 }).map((_, i) => mockTweet({ id: `t${i}`, createdAt: new Date(now.getTime() - i * 1000) }));
+            const tweets = Array.from({ length: 21 }).map((_, i) =>
+                mockTweet({ id: `t${i}`, createdAt: new Date(now.getTime() - i * 1000) })
+            );
             mockQueryBuilder.getMany.mockResolvedValue(tweets);
 
             const res = await service.getTimeline(userId, undefined, 20);
@@ -122,54 +132,102 @@ describe('TweetsService', () => {
             expect(res).toHaveProperty('hasMore');
             expect(res.hasMore).toBe(true);
             expect(res.nextCursor).toBeDefined();
+        });
 
-
-            // simulate request exceeding max limit to ensure it is clamped
+        it('clamps limit to max 50 and returns correct pagination', async () => {
+            const userId = 'follower-1';
             mockQueryBuilder.getMany.mockResolvedValue(
                 Array.from({ length: 51 }).map((_, i) => mockTweet({ id: `t${i}` }))
             );
 
             const res2 = await service.getTimeline(userId, undefined, 100);
 
-            // service should request max 50 + 1 for pagination detection
             expect(mockQueryBuilder.take).toHaveBeenCalledWith(51);
-
-            // 51 returned => 50 data + hasMore=true
             expect(res2.hasMore).toBe(true);
             expect(res2.data.length).toBe(50);
             expect(res2.nextCursor).toBeDefined();
-
-
         });
 
         it('throws BadRequestException for invalid cursor', async () => {
             await expect(service.getTimeline('u', 'not-a-date', 20)).rejects.toThrow(BadRequestException);
         });
 
-        it('normalizes invalid limit to default and clamps to max 50', async () => {
+        it('normalizes invalid limit to default 20', async () => {
             mockQueryBuilder.getMany.mockResolvedValue([]);
             await service.getTimeline('u', undefined, -5);
-            // verify limit+1 strategy is applied for pagination
             expect(mockQueryBuilder.take).toHaveBeenCalledWith(21);
+        });
+
+        it('clamps limit 1000 to max 50', async () => {
+            mockQueryBuilder.getMany.mockResolvedValue([]);
             await service.getTimeline('u', undefined, 1000);
             expect(mockQueryBuilder.take).toHaveBeenCalledWith(51);
         });
 
-        it('filters by cursor when provided and returns no sensitive user fields', async () => {
+        it('includes liked field based on likeRepo query', async () => {
+            const userId = 'follower-1';
+            const tweet = mockTweet({ id: 'tweet-liked' });
+            mockQueryBuilder.getMany.mockResolvedValue([tweet]);
+            mockLikeRepository.query.mockResolvedValue([{ tweet_id: 'tweet-liked' }]);
+
+            const res = await service.getTimeline(userId, undefined, 20);
+
+            expect(res.data[0]).toHaveProperty('liked', true);
+        });
+
+        it('liked is false when user has not liked the tweet', async () => {
+            const userId = 'follower-1';
+            const tweet = mockTweet({ id: 'tweet-not-liked' });
+            mockQueryBuilder.getMany.mockResolvedValue([tweet]);
+            mockLikeRepository.query.mockResolvedValue([]);
+
+            const res = await service.getTimeline(userId, undefined, 20);
+
+            expect(res.data[0]).toHaveProperty('liked', false);
+        });
+
+        it('returns no sensitive user fields', async () => {
             const userId = 'follower-1';
             const oldDate = new Date('2000-01-01T00:00:00.000Z');
-            const tweets = [mockTweet({ id: 't1', createdAt: oldDate, user: { id: 'u1', username: 'u1', displayName: 'u1', avatarUrl: null } })];
+
+            const tweets = [
+                mockTweet({
+                    id: 't1',
+                    createdAt: oldDate,
+                    user: {
+                        id: 'u1',
+                        username: 'u1',
+                        displayName: 'u1',
+                        avatarUrl: null,
+                    },
+                }),
+            ];
+
             mockQueryBuilder.getMany.mockResolvedValue(tweets);
 
-            const res = await service.getTimeline(userId, oldDate.toISOString(), 20);
+            const cursor = Buffer.from(
+                JSON.stringify({
+                    createdAt: oldDate.toISOString(),
+                    id: 'cursor-id',
+                }),
+            ).toString('base64');
 
-            expect(res.data.length).toBeGreaterThanOrEqual(0);
+            const res = await service.getTimeline(
+                userId,
+                cursor,
+                20,
+            );
+
             res.data.forEach((t) => {
                 expect(t.user).toHaveProperty('id');
                 expect(t.user).toHaveProperty('username');
+                expect(t.user).toHaveProperty('displayName');
+                expect(t.user).toHaveProperty('avatarUrl');
+
                 expect(t.user).not.toHaveProperty('password');
                 expect(t.user).not.toHaveProperty('email');
             });
         });
+
     });
 });

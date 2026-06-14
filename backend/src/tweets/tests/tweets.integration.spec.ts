@@ -143,7 +143,6 @@ describe('Tweets (integration)', () => {
         });
 
         it('403 if user is not author', async () => {
-            // create new tweet by userA
             const res = await request(app.getHttpServer())
                 .post('/api/tweets')
                 .set('Authorization', `Bearer ${userAToken}`)
@@ -271,23 +270,41 @@ describe('Tweets (integration)', () => {
             res.body.data.forEach((t: any) => {
                 expect(t.user).toHaveProperty('id');
                 expect(t.user).toHaveProperty('username');
-                expect(t.user).toHaveProperty('display_name');
-                expect(t.user).toHaveProperty('avatar_url');
+                expect(t.user).toHaveProperty('displayName');
+                expect(t.user).toHaveProperty('avatarUrl');
                 expect(t.user).not.toHaveProperty('password');
                 expect(t.user).not.toHaveProperty('email');
                 expect(t.user).not.toHaveProperty('isActive');
+                expect(t).toHaveProperty('liked');
             });
         });
 
         it('cursor pagination works correctly', async () => {
             await ensureFollow();
-            await dataSource.query(`DELETE FROM tweets WHERE user_id = $1`, [timelineUserAId]);
 
+            await dataSource.query(`DELETE FROM tweets`);
+
+            // insertar directamente con SQL para garantizar timestamps únicos y controlados
             for (let i = 0; i < 25; i++) {
-                await request(app.getHttpServer())
-                    .post('/api/tweets')
-                    .set('Authorization', `Bearer ${timelineUserAToken}`)
-                    .send({ content: `tweet-${i}` });
+                await dataSource.query(
+                    `INSERT INTO tweets (
+                id,
+                user_id,
+                content,
+                likes_count,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                gen_random_uuid(),
+                $1,
+                $2,
+                0,
+                NOW() - ($3 * INTERVAL '1 second'),
+                NOW() - ($3 * INTERVAL '1 second')
+            )`,
+                    [timelineUserAId, `tweet-${i}`, 25 - i],
+                );
             }
 
             const page1 = await request(app.getHttpServer())
@@ -297,14 +314,47 @@ describe('Tweets (integration)', () => {
 
             expect(page1.body.hasMore).toBe(true);
             expect(page1.body.nextCursor).toBeTruthy();
+            expect(page1.body.data.length).toBe(20);
 
             const page2 = await request(app.getHttpServer())
-                .get(`/api/tweets/timeline?cursor=${encodeURIComponent(page1.body.nextCursor)}`)
+                .get(
+                    `/api/tweets/timeline?cursor=${encodeURIComponent(
+                        page1.body.nextCursor,
+                    )}`,
+                )
                 .set('Authorization', `Bearer ${timelineUserBToken}`)
                 .expect(200);
 
             expect(page2.body.hasMore).toBe(false);
-            expect(page1.body.data.length + page2.body.data.length).toBe(25);
+            expect(page2.body.data.length).toBe(5);
+            expect(
+                page1.body.data.length + page2.body.data.length,
+            ).toBe(25);
+
+            // no hay duplicados entre páginas
+            const page1Ids = new Set(
+                page1.body.data.map((t: any) => t.id),
+            );
+
+            page2.body.data.forEach((t: any) => {
+                expect(page1Ids.has(t.id)).toBe(false);
+            });
+
+            // tweets de page2 son más viejos que el cursor
+            const decodedCursor = JSON.parse(
+                Buffer.from(
+                    page1.body.nextCursor,
+                    'base64',
+                ).toString(),
+            );
+
+            const cursorDate = new Date(decodedCursor.createdAt);
+
+            page2.body.data.forEach((t: any) => {
+                expect(
+                    new Date(t.createdAt).getTime(),
+                ).toBeLessThanOrEqual(cursorDate.getTime());
+            });
         });
 
         it('respects limit param', async () => {
