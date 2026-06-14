@@ -19,6 +19,7 @@ interface FollowItem {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    isFollowing: boolean;
 }
 
 type Tab = 'tweets' | 'followers' | 'following';
@@ -295,7 +296,7 @@ function UserRow({ user, currentUserId }: { user: FollowItem; currentUserId?: st
 
             <FollowButton
                 username={user.username}
-                initialFollowing={false}
+                initialFollowing={user.isFollowing}
                 currentUserId={currentUserId}
                 targetUserId={user.id}
             />

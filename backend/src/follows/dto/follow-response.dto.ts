@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsOptional } from 'class-validator';
+import { IsString, IsUUID, IsOptional, IsBoolean } from 'class-validator';
 
 export class FollowResponseDto {
     @IsUUID()
@@ -14,4 +14,7 @@ export class FollowResponseDto {
     @IsString()
     @IsOptional()
     avatarUrl: string | null;
+
+    @IsBoolean()
+    isFollowing: boolean;
 }

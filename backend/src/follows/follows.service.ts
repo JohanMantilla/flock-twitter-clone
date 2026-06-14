@@ -82,7 +82,8 @@ export class FollowsService {
         };
     }
 
-    async getFollowers(username: string): Promise<FollowResponseDto[]> {
+
+    async getFollowers(username: string, currentUserId?: string): Promise<FollowResponseDto[]> {
         const targetUser = await this.userRepo.findOne({
             where: { username: username.toLowerCase() },
             select: { id: true },
@@ -104,15 +105,21 @@ export class FollowsService {
             ])
             .getMany();
 
+        const followingIds = await this.getMyFollowingIdsAmong(
+            currentUserId,
+            follows.map(f => f.follower.id),
+        );
+
         return follows.map(f => ({
             id: f.follower.id,
             username: f.follower.username,
             displayName: f.follower.displayName ?? null,
             avatarUrl: f.follower.avatarUrl ?? null,
+            isFollowing: followingIds.has(f.follower.id),
         }));
     }
 
-    async getFollowing(username: string): Promise<FollowResponseDto[]> {
+    async getFollowing(username: string, currentUserId?: string): Promise<FollowResponseDto[]> {
         const targetUser = await this.userRepo.findOne({
             where: { username: username.toLowerCase() },
             select: { id: true },
@@ -134,11 +141,36 @@ export class FollowsService {
             ])
             .getMany();
 
+        const followingIds = await this.getMyFollowingIdsAmong(
+            currentUserId,
+            follows.map(f => f.following.id),
+        );
+
         return follows.map(f => ({
             id: f.following.id,
             username: f.following.username,
             displayName: f.following.displayName ?? null,
             avatarUrl: f.following.avatarUrl ?? null,
+            isFollowing: followingIds.has(f.following.id),
         }));
     }
+
+    private async getMyFollowingIdsAmong(
+        currentUserId: string | undefined,
+        candidateIds: string[],
+    ): Promise<Set<string>> {
+        if (!currentUserId || candidateIds.length === 0) {
+            return new Set();
+        }
+
+        const myFollows = await this.followRepo
+            .createQueryBuilder('follow')
+            .where('follow.follower_id = :currentUserId', { currentUserId })
+            .andWhere('follow.following_id IN (:...candidateIds)', { candidateIds })
+            .select(['follow.following_id'])
+            .getMany();
+
+        return new Set(myFollows.map(f => f.following_id));
+    }
+
 }

@@ -28,16 +28,20 @@ export class FollowsController {
     }
 
     @Get(':username/followers')
+    @UseGuards(JwtAuthGuard)
     getFollowers(
         @Param('username') username: string,
+        @GetUser() currentUser: User,
     ): Promise<FollowResponseDto[]> {
-        return this.followsService.getFollowers(username);
+        return this.followsService.getFollowers(username, currentUser.id);
     }
 
     @Get(':username/following')
+    @UseGuards(JwtAuthGuard)
     getFollowing(
         @Param('username') username: string,
+        @GetUser() currentUser: User,
     ): Promise<FollowResponseDto[]> {
-        return this.followsService.getFollowing(username);
+        return this.followsService.getFollowing(username, currentUser.id);
     }
 }
