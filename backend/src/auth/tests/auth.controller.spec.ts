@@ -5,6 +5,7 @@ import { AuthService } from '../auth.service';
 const mockAuthService = {
     register: jest.fn(),
     login: jest.fn(),
+    getMe: jest.fn(),
 };
 
 const mockAuthResponse = {
@@ -15,6 +16,18 @@ const mockAuthResponse = {
         displayName: 'testuser',
     },
     token: 'mock.jwt.token',
+};
+
+const mockUser = {
+    id: 'uuid-123',
+    email: 'test@test.com',
+    username: 'testuser',
+    displayName: 'testuser',
+    bio: null,
+    avatarUrl: null,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
 };
 
 describe('AuthController', () => {
@@ -53,5 +66,16 @@ describe('AuthController', () => {
             expect(result).toEqual(mockAuthResponse);
         });
     });
-});
 
+    describe('getProfile', () => {
+        it('should call authService.getMe with userId and return user', async () => {
+            mockAuthService.getMe.mockResolvedValue(mockUser);
+
+            const result = await controller.getProfile('uuid-123');
+
+            expect(mockAuthService.getMe).toHaveBeenCalledWith('uuid-123');
+            expect(result).toEqual(mockUser);
+            expect(result).not.toHaveProperty('password');
+        });
+    });
+});

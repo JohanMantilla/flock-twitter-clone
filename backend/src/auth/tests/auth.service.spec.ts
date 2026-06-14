@@ -156,4 +156,54 @@ describe('AuthService', () => {
             ).rejects.toThrow(UnauthorizedException);
         });
     });
+
+    describe('getMe', () => {
+        it('should return user without password when userId is valid', async () => {
+            const userWithoutPassword = { ...mockUser };
+            delete (userWithoutPassword as any).password;
+            mockUserRepository.findOne.mockResolvedValue(userWithoutPassword);
+
+            const result = await service.getMe('uuid-123');
+
+            expect(result).toBeDefined();
+            expect(result).not.toHaveProperty('password');
+            expect(result.id).toBe('uuid-123');
+            expect(result.email).toBe('test@test.com');
+        });
+
+        it('should throw UnauthorizedException when user is not found', async () => {
+            mockUserRepository.findOne.mockResolvedValue(null);
+
+            await expect(service.getMe('nonexistent-id')).rejects.toThrow(
+                UnauthorizedException,
+            );
+        });
+
+        it('should return all required profile fields', async () => {
+            const userWithoutPassword = {
+                id: mockUser.id,
+                email: mockUser.email,
+                username: mockUser.username,
+                displayName: mockUser.displayName,
+                bio: mockUser.bio,
+                avatarUrl: mockUser.avatarUrl,
+                isActive: mockUser.isActive,
+                createdAt: mockUser.createdAt,
+                updatedAt: mockUser.updatedAt,
+            };
+            mockUserRepository.findOne.mockResolvedValue(userWithoutPassword);
+
+            const result = await service.getMe('uuid-123');
+
+            expect(result).toHaveProperty('id');
+            expect(result).toHaveProperty('email');
+            expect(result).toHaveProperty('username');
+            expect(result).toHaveProperty('displayName');
+            expect(result).toHaveProperty('bio');
+            expect(result).toHaveProperty('avatarUrl');
+            expect(result).toHaveProperty('isActive');
+            expect(result).toHaveProperty('createdAt');
+            expect(result).toHaveProperty('updatedAt');
+        });
+    });
 });
