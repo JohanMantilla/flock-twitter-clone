@@ -56,37 +56,79 @@ export class TweetsService {
         cursor?: string,
         limit = 20,
     ): Promise<TimelineResponseDto> {
+
+        const take = this.normalizeLimit(limit);
+
+        const decodedCursor = this.decodeCursor(cursor);
+
+        const tweets = await this.findTimelineTweets(
+            userId,
+            take,
+            decodedCursor,
+        );
+
+        const { paginatedTweets, hasMore, nextCursor } =
+            this.buildPagination(tweets, take);
+
+        const likedTweetIds =
+            await this.getLikedTweetIds(userId);
+
+        return {
+            data: this.mapSafeTweets(
+                paginatedTweets,
+                likedTweetIds,
+            ),
+            nextCursor,
+            hasMore,
+        };
+    }
+
+    private normalizeLimit(limit: number): number {
         let limitInt = Math.floor(Number(limit));
 
         if (!Number.isFinite(limitInt) || limitInt <= 0) {
             limitInt = 20;
         }
 
-        const take = Math.min(limitInt, 50);
+        return Math.min(limitInt, 50);
+    }
 
-        let cursorCreatedAt: Date | null = null;
-        let cursorId: string | null = null;
+    private decodeCursor(
+        cursor?: string,
+    ): { createdAt: Date; id: string } | null {
 
-        if (cursor) {
-            try {
-                const decoded = JSON.parse(
-                    Buffer.from(cursor, 'base64').toString('utf8'),
-                );
-
-                cursorCreatedAt = new Date(decoded.createdAt);
-
-                if (
-                    isNaN(cursorCreatedAt.getTime()) ||
-                    typeof decoded.id !== 'string'
-                ) {
-                    throw new Error();
-                }
-
-                cursorId = decoded.id;
-            } catch {
-                throw new BadRequestException('Invalid cursor');
-            }
+        if (!cursor) {
+            return null;
         }
+
+        try {
+            const decoded = JSON.parse(
+                Buffer.from(cursor, 'base64').toString('utf8'),
+            );
+
+            const createdAt = new Date(decoded.createdAt);
+
+            if (
+                isNaN(createdAt.getTime()) ||
+                typeof decoded.id !== 'string'
+            ) {
+                throw new Error();
+            }
+
+            return {
+                createdAt,
+                id: decoded.id,
+            };
+        } catch {
+            throw new BadRequestException('Invalid cursor');
+        }
+    }
+
+    private async findTimelineTweets(
+        userId: string,
+        take: number,
+        cursor: { createdAt: Date; id: string } | null,
+    ): Promise<Tweet[]> {
 
         const qb = this.tweetRepository
             .createQueryBuilder('tweet')
@@ -107,7 +149,7 @@ export class TweetsService {
             .addOrderBy('tweet.id', 'DESC')
             .take(take + 1);
 
-        if (cursorCreatedAt && cursorId) {
+        if (cursor) {
             qb.andWhere(
                 `(
                 tweet.created_at < :cursorCreatedAt
@@ -117,14 +159,19 @@ export class TweetsService {
                 )
             )`,
                 {
-                    cursorCreatedAt,
-                    cursorId,
+                    cursorCreatedAt: cursor.createdAt,
+                    cursorId: cursor.id,
                 },
             );
         }
 
-        const tweets = await qb.getMany();
+        return qb.getMany();
+    }
 
+    private buildPagination(
+        tweets: Tweet[],
+        take: number,
+    ) {
         const hasMore = tweets.length > take;
 
         if (hasMore) {
@@ -136,11 +183,26 @@ export class TweetsService {
                 ? Buffer.from(
                     JSON.stringify({
                         createdAt:
-                            tweets[tweets.length - 1].createdAt.toISOString(),
-                        id: tweets[tweets.length - 1].id,
+                            tweets[
+                                tweets.length - 1
+                            ].createdAt.toISOString(),
+                        id: tweets[
+                            tweets.length - 1
+                        ].id,
                     }),
                 ).toString('base64')
                 : null;
+
+        return {
+            paginatedTweets: tweets,
+            hasMore,
+            nextCursor,
+        };
+    }
+
+    private async getLikedTweetIds(
+        userId: string,
+    ): Promise<Set<string>> {
 
         const likedRows: { tweet_id: string }[] =
             await this.likeRepo.query(
@@ -150,11 +212,16 @@ export class TweetsService {
                 [userId],
             );
 
-        const likedTweetIds = new Set(
+        return new Set(
             likedRows.map((l) => l.tweet_id),
         );
+    }
 
-        const safeTweets = tweets.map((tweet) => ({
+    private mapSafeTweets(
+        tweets: Tweet[],
+        likedTweetIds: Set<string>,
+    ) {
+        return tweets.map((tweet) => ({
             ...tweet,
             liked: likedTweetIds.has(tweet.id),
             user: {
@@ -164,12 +231,6 @@ export class TweetsService {
                 avatarUrl: tweet.user.avatarUrl,
             },
         }));
-
-        return {
-            data: safeTweets,
-            nextCursor,
-            hasMore,
-        };
     }
 
     handleDBErrors(error: any): never {
