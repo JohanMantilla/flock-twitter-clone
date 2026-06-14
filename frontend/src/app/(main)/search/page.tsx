@@ -13,6 +13,7 @@ interface SearchUser {
     username: string;
     displayName: string | null;
     avatarUrl: string | null;
+    isFollowing: boolean;
 }
 
 export default function SearchPage() {
@@ -127,7 +128,7 @@ export default function SearchPage() {
                             <div onClick={e => e.stopPropagation()}>
                                 <FollowButton
                                     username={user.username}
-                                    initialFollowing={false}
+                                    initialFollowing={user.isFollowing}
                                     currentUserId={currentUser?.id}
                                     targetUserId={user.id}
                                 />

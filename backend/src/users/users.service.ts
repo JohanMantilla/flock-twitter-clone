@@ -4,13 +4,17 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { SearchUserDto } from './dto/search-user.dto';
+import { Follow } from '../follows/entities/follow.entity';
 
 @Injectable()
 export class UsersService {
 
   constructor(
     @InjectRepository(User)
-    private readonly userRepository: Repository<User>
+    private readonly userRepository: Repository<User>,
+
+    @InjectRepository(Follow)
+    private readonly followRepo: Repository<Follow>,
   ) { }
 
   findAll() {
@@ -37,13 +41,13 @@ export class UsersService {
 
     const [tweetsCount, followersCount, followingCount] = await Promise.all([
       this.userRepository.query(
-        `SELECT COUNT(*) FROM tweets WHERE user_id = $1`, [user.id]
+        'SELECT COUNT(*) FROM tweets WHERE user_id = $1', [user.id]
       ),
       this.userRepository.query(
-        `SELECT COUNT(*) FROM follows WHERE following_id = $1`, [user.id]
+        'SELECT COUNT(*) FROM follows WHERE following_id = $1', [user.id]
       ),
       this.userRepository.query(
-        `SELECT COUNT(*) FROM follows WHERE follower_id = $1`, [user.id]
+        'SELECT COUNT(*) FROM follows WHERE follower_id = $1', [user.id]
       ),
     ]);
 
@@ -69,12 +73,12 @@ export class UsersService {
     }
   }
 
-  async search(query: string): Promise<SearchUserDto[]> {
+  async search(query: string, currentUserId: string): Promise<SearchUserDto[]> {
     const sanitized = query.trim().replace(/\s+/g, ' ').substring(0, 100);
 
     if (!sanitized) return [];
 
-    const term = `%${sanitized}%`;
+    const term = '%' + sanitized + '%';
 
     const users = await this.userRepository
       .createQueryBuilder('user')
@@ -90,11 +94,17 @@ export class UsersService {
       .limit(20)
       .getMany();
 
+    const followingIds = await this.getMyFollowingIdsAmong(
+      currentUserId,
+      users.map(u => u.id),
+    );
+
     return users.map(user => ({
       id: user.id,
       username: user.username,
       displayName: user.displayName ?? null,
       avatarUrl: user.avatarUrl ?? null,
+      isFollowing: followingIds.has(user.id),
     }));
   }
 
@@ -149,6 +159,24 @@ export class UsersService {
       nextCursor,
       hasMore,
     };
+  }
+
+  private async getMyFollowingIdsAmong(
+    currentUserId: string,
+    candidateIds: string[],
+  ): Promise<Set<string>> {
+    if (candidateIds.length === 0) {
+      return new Set();
+    }
+
+    const myFollows = await this.followRepo
+      .createQueryBuilder('follow')
+      .where('follow.follower_id = :currentUserId', { currentUserId })
+      .andWhere('follow.following_id IN (:...candidateIds)', { candidateIds })
+      .select(['follow.following_id'])
+      .getMany();
+
+    return new Set(myFollows.map(f => f.following_id));
   }
 
   handleDBErrors(error: any): never {

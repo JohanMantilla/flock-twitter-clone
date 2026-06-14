@@ -11,8 +11,9 @@ export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
   @Get('search')
-  search(@Query('q') q: string = ''): Promise<SearchUserDto[]> {
-    return this.usersService.search(q);
+  @UseGuards(JwtAuthGuard)
+  search(@Query('q') q: string = '', @GetUser() currentUser: User): Promise<SearchUserDto[]> {
+    return this.usersService.search(q, currentUser.id);
   }
 
   @Get(':username/stats')
