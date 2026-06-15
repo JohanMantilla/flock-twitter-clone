@@ -22,13 +22,13 @@ describe('UsersController', () => {
     let controller: UsersController;
 
     beforeEach(async () => {
+        jest.resetAllMocks();
         const module: TestingModule = await Test.createTestingModule({
             controllers: [UsersController],
             providers: [{ provide: UsersService, useValue: mockUsersService }],
         }).compile();
 
         controller = module.get<UsersController>(UsersController);
-        jest.clearAllMocks();
     });
 
     describe('findOne', () => {

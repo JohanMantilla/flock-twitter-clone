@@ -34,13 +34,16 @@ describe('AuthController', () => {
     let controller: AuthController;
 
     beforeEach(async () => {
+
+        jest.resetAllMocks();
+
         const module: TestingModule = await Test.createTestingModule({
             controllers: [AuthController],
             providers: [{ provide: AuthService, useValue: mockAuthService }],
         }).compile();
 
         controller = module.get<AuthController>(AuthController);
-        jest.clearAllMocks();
+
     });
 
     describe('register', () => {
