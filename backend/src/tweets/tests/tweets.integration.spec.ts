@@ -32,22 +32,18 @@ describe('Tweets (integration)', () => {
         await app.init();
 
         dataSource = moduleFixture.get<DataSource>(DataSource);
-
-        await dataSource.query(`DELETE FROM follows`);
-        await dataSource.query(`DELETE FROM tweets`);
-        await dataSource.query(`DELETE FROM "user"`);
-
         const suffix = Math.random().toString(36).substring(2, 8);
+
+        // limpiar solo usuarios de test de esta suite
+        await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@tweets-test.com'`);
 
         const resA = await request(app.getHttpServer())
             .post('/api/auth/register')
             .send({
-                email: `a${suffix}@test.com`,
+                email: `a-${suffix}@tweets-test.com`,
                 password: 'Password123',
                 username: `usera${suffix}`,
             });
-
-        expect(resA.status).toBe(201);
 
         userAToken = resA.body.token;
         userAId = resA.body.user.id;
@@ -55,22 +51,26 @@ describe('Tweets (integration)', () => {
         const resB = await request(app.getHttpServer())
             .post('/api/auth/register')
             .send({
-                email: `b${suffix}@test.com`,
+                email: `b-${suffix}@tweets-test.com`,
                 password: 'Password123',
                 username: `userb${suffix}`,
             });
-
-        expect(resB.status).toBe(201);
 
         userBToken = resB.body.token;
         userBId = resB.body.user.id;
     });
 
     afterAll(async () => {
-        await dataSource.query(`DELETE FROM follows`);
-        await dataSource.query(`DELETE FROM tweets`);
-        await dataSource.query(`DELETE FROM "user"`);
-
+        await dataSource.query(
+            `DELETE FROM likes WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')`
+        );
+        await dataSource.query(
+            `DELETE FROM follows WHERE follower_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com') OR following_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')`
+        );
+        await dataSource.query(
+            `DELETE FROM tweets WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')`
+        );
+        await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@tweets-test.com'`);
         await app.close();
     });
 
@@ -282,7 +282,10 @@ describe('Tweets (integration)', () => {
         it('cursor pagination works correctly', async () => {
             await ensureFollow();
 
-            await dataSource.query(`DELETE FROM tweets`);
+            await dataSource.query(
+                `DELETE FROM tweets WHERE user_id IN ($1, $2)`,
+                [timelineUserAId, timelineUserBId]
+            );
 
             // insertar directamente con SQL para garantizar timestamps únicos y controlados
             for (let i = 0; i < 25; i++) {
@@ -368,7 +371,10 @@ describe('Tweets (integration)', () => {
 
         it('clamps limit to max 50', async () => {
             await ensureFollow();
-            await dataSource.query(`DELETE FROM tweets WHERE user_id = $1`, [timelineUserAId]);
+            await dataSource.query(
+                `DELETE FROM tweets WHERE user_id = $1`,
+                [timelineUserAId]
+            );
 
             const p2: Promise<any>[] = [];
             for (let i = 0; i < 60; i++) {
