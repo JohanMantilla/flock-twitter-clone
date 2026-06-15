@@ -26,9 +26,6 @@ describe('Follows (integration)', () => {
         await app.init();
         dataSource = moduleFixture.get<DataSource>(DataSource);
 
-        await dataSource.query(`DELETE FROM follows`);
-        await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@follows-test.com'`);
-
         const suffix = Math.random().toString(36).substring(2, 8);
         userAUsername = `followtesta${suffix}`;
         userBUsername = `followtestb${suffix}`;
@@ -57,14 +54,28 @@ describe('Follows (integration)', () => {
     });
 
     afterAll(async () => {
-        await dataSource.query(`DELETE FROM follows`);
-        await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@follows-test.com'`);
+        await dataSource.query(`
+        DELETE FROM follows
+        WHERE "follower_id" IN (
+            SELECT id FROM "user" WHERE email LIKE '%@follows-test.com'
+        )
+        `);
+
+        await dataSource.query(`
+        DELETE FROM "user"
+        WHERE email LIKE '%@follows-test.com'
+        `);
         await app.close();
     });
 
     describe('POST /api/users/:username/follow', () => {
         afterEach(async () => {
-            await dataSource.query(`DELETE FROM follows`);
+            await dataSource.query(`
+                DELETE FROM follows
+                WHERE "follower_id" IN (
+                    SELECT id FROM "user" WHERE email LIKE '%@follows-test.com'
+                )
+                `);
         });
 
         it('201 follow exitoso', async () => {
@@ -116,7 +127,13 @@ describe('Follows (integration)', () => {
         });
 
         afterEach(async () => {
-            await dataSource.query(`DELETE FROM follows`);
+            await dataSource.query(`
+                DELETE FROM follows
+                WHERE "follower_id" IN (
+                    SELECT id FROM "user"
+                    WHERE email LIKE '%@follows-test.com'
+                )
+            `);
         });
 
         it('200 al dejar de seguir exitosamente', async () => {
@@ -142,7 +159,13 @@ describe('Follows (integration)', () => {
         });
 
         it('404 si no sigue al usuario', async () => {
-            await dataSource.query(`DELETE FROM follows`);
+            await dataSource.query(`
+                DELETE FROM follows
+                WHERE "follower_id" IN (
+                    SELECT id FROM "user"
+                    WHERE email LIKE '%@follows-test.com'
+                )
+            `);
 
             await request(app.getHttpServer())
                 .delete(`/api/users/${userBUsername}/follow`)
@@ -153,7 +176,12 @@ describe('Follows (integration)', () => {
 
     describe('GET /api/users/:username/followers', () => {
         beforeAll(async () => {
-            await dataSource.query(`DELETE FROM follows`);
+            await dataSource.query(`
+                DELETE FROM follows
+                WHERE "follower_id" IN (
+                    SELECT id FROM "user" WHERE email LIKE '%@follows-test.com'
+                )
+                `);
             await request(app.getHttpServer())
                 .post(`/api/users/${userBUsername}/follow`)
                 .set('Authorization', `Bearer ${userAToken}`);

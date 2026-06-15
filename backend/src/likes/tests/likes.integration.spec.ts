@@ -27,8 +27,22 @@ describe('Likes (integration)', () => {
 
         const suffix = Math.random().toString(36).substring(2, 8);
 
-        await dataSource.query(`DELETE FROM likes`);
-        await dataSource.query(`DELETE FROM tweets`);
+        await dataSource.query(`
+            DELETE FROM likes
+            WHERE user_id IN (
+                SELECT id
+                FROM "user"
+                WHERE email LIKE '%@likes-test.com'
+            )
+        `);
+        await dataSource.query(`
+    DELETE FROM tweets
+    WHERE user_id IN (
+        SELECT id
+        FROM "user"
+        WHERE email LIKE '%@likes-test.com'
+    )
+`);
         await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@likes-test.com'`);
 
         const res = await request(app.getHttpServer())
@@ -53,7 +67,14 @@ describe('Likes (integration)', () => {
     });
 
     afterAll(async () => {
-        await dataSource.query(`DELETE FROM likes`);
+        await dataSource.query(`
+    DELETE FROM likes
+    WHERE user_id IN (
+        SELECT id
+        FROM "user"
+        WHERE email LIKE '%@likes-test.com'
+    )
+`);
         await dataSource.query(`DELETE FROM tweets WHERE user_id = $1`, [likerUserId]);
         await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@likes-test.com'`);
         await app.close();
@@ -61,9 +82,15 @@ describe('Likes (integration)', () => {
 
     describe('POST /api/tweets/:id/like', () => {
         afterEach(async () => {
-            await dataSource.query(`DELETE FROM likes`);
             await dataSource.query(
-                `UPDATE tweets SET likes_count = 0 WHERE id = $1`,
+                `DELETE FROM likes WHERE user_id = $1`,
+                [likerUserId],
+            );
+
+            await dataSource.query(
+                `UPDATE tweets
+         SET likes_count = 0
+         WHERE id = $1`,
                 [tweetId],
             );
         });
@@ -118,7 +145,14 @@ describe('Likes (integration)', () => {
 
     describe('DELETE /api/tweets/:id/like', () => {
         beforeEach(async () => {
-            await dataSource.query(`DELETE FROM likes`);
+            await dataSource.query(`
+    DELETE FROM likes
+    WHERE user_id IN (
+        SELECT id
+        FROM "user"
+        WHERE email LIKE '%@likes-test.com'
+    )
+`);
             await dataSource.query(
                 `UPDATE tweets SET likes_count = 0 WHERE id = $1`,
                 [tweetId],
@@ -152,7 +186,14 @@ describe('Likes (integration)', () => {
         });
 
         it('400 if not liked', async () => {
-            await dataSource.query(`DELETE FROM likes`);
+            await dataSource.query(`
+    DELETE FROM likes
+    WHERE user_id IN (
+        SELECT id
+        FROM "user"
+        WHERE email LIKE '%@likes-test.com'
+    )
+`);
             await dataSource.query(
                 `UPDATE tweets SET likes_count = 0 WHERE id = $1`,
                 [tweetId],

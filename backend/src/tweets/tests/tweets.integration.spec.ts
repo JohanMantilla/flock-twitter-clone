@@ -199,8 +199,8 @@ describe('Tweets (integration)', () => {
         const ensureFollow = async () => {
             await dataSource.query(
                 `INSERT INTO follows (id, follower_id, following_id, created_at)
-             VALUES (gen_random_uuid(), $1, $2, now())
-             ON CONFLICT DO NOTHING`,
+                    VALUES (gen_random_uuid(), $1, $2, now())
+                    ON CONFLICT DO NOTHING`,
                 [timelineUserBId, timelineUserAId],
             );
         };
@@ -211,7 +211,7 @@ describe('Tweets (integration)', () => {
             const resA = await request(app.getHttpServer())
                 .post('/api/auth/register')
                 .send({
-                    email: `timeline-a-${suffix}@test.com`,
+                    email: `timeline-a-${suffix}@tweets-test.com`,
                     password: 'Password123',
                     username: `timelinea${suffix}`,
                 });
@@ -223,7 +223,7 @@ describe('Tweets (integration)', () => {
             const resB = await request(app.getHttpServer())
                 .post('/api/auth/register')
                 .send({
-                    email: `timeline-b-${suffix}@test.com`,
+                    email: `timeline-b-${suffix}@tweets-test.com`,
                     password: 'Password123',
                     username: `timelineb${suffix}`,
                 });
@@ -241,7 +241,7 @@ describe('Tweets (integration)', () => {
             const resC = await request(app.getHttpServer())
                 .post('/api/auth/register')
                 .send({
-                    email: `c${suffix}@test.com`,
+                    email: `c${suffix}@tweets-test.com`,
                     password: 'Password123',
                     username: `userc${suffix}`,
                 });
@@ -291,21 +291,21 @@ describe('Tweets (integration)', () => {
             for (let i = 0; i < 25; i++) {
                 await dataSource.query(
                     `INSERT INTO tweets (
-                id,
-                user_id,
-                content,
-                likes_count,
-                created_at,
-                updated_at
-            )
-            VALUES (
-                gen_random_uuid(),
-                $1,
-                $2,
-                0,
-                NOW() - ($3 * INTERVAL '1 second'),
-                NOW() - ($3 * INTERVAL '1 second')
-            )`,
+                        id,
+                        user_id,
+                        content,
+                        likes_count,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        gen_random_uuid(),
+                        $1,
+                        $2,
+                        0,
+                        NOW() - ($3 * INTERVAL '1 second'),
+                        NOW() - ($3 * INTERVAL '1 second')
+                    )`,
                     [timelineUserAId, `tweet-${i}`, 25 - i],
                 );
             }
