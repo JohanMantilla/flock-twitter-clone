@@ -29,13 +29,14 @@ describe('Follows (integration)', () => {
         await dataSource.query(`DELETE FROM follows`);
         await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@follows-test.com'`);
 
-        userAUsername = 'followtesta';
-        userBUsername = 'followtestb';
+        const suffix = Math.random().toString(36).substring(2, 8);
+        userAUsername = `followtesta${suffix}`;
+        userBUsername = `followtestb${suffix}`;
 
         const resA = await request(app.getHttpServer())
             .post('/api/auth/register')
             .send({
-                email: 'follow-a@follows-test.com',
+                email: `follow-a-${suffix}@follows-test.com`,
                 password: 'Password1',
                 username: userAUsername,
             });
@@ -46,7 +47,7 @@ describe('Follows (integration)', () => {
         const resB = await request(app.getHttpServer())
             .post('/api/auth/register')
             .send({
-                email: 'follow-b@follows-test.com',
+                email: `follow-b-${suffix}@follows-test.com`,
                 password: 'Password1',
                 username: userBUsername,
             });
@@ -158,18 +159,26 @@ describe('Follows (integration)', () => {
                 .set('Authorization', `Bearer ${userAToken}`);
         });
 
+        it('401 sin token', async () => {
+            await request(app.getHttpServer())
+                .get(`/api/users/${userBUsername}/followers`)
+                .expect(401);
+        });
+
         it('200 retorna lista de seguidores', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/${userBUsername}/followers`)
+                .set('Authorization', `Bearer ${userAToken}`)
                 .expect(200);
 
             expect(Array.isArray(res.body)).toBe(true);
             expect(res.body.length).toBe(1);
         });
 
-        it('cada item tiene los campos correctos', async () => {
+        it('cada item tiene los campos correctos incluyendo isFollowing', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/${userBUsername}/followers`)
+                .set('Authorization', `Bearer ${userAToken}`)
                 .expect(200);
 
             const follower = res.body[0];
@@ -177,6 +186,7 @@ describe('Follows (integration)', () => {
             expect(follower).toHaveProperty('username');
             expect(follower).toHaveProperty('displayName');
             expect(follower).toHaveProperty('avatarUrl');
+            expect(follower).toHaveProperty('isFollowing');
             expect(follower).not.toHaveProperty('password');
             expect(follower).not.toHaveProperty('email');
             expect(follower).not.toHaveProperty('isActive');
@@ -185,23 +195,32 @@ describe('Follows (integration)', () => {
         it('404 si el username no existe', async () => {
             await request(app.getHttpServer())
                 .get('/api/users/nonexistentuser9999/followers')
+                .set('Authorization', `Bearer ${userAToken}`)
                 .expect(404);
         });
     });
 
     describe('GET /api/users/:username/following', () => {
+        it('401 sin token', async () => {
+            await request(app.getHttpServer())
+                .get(`/api/users/${userAUsername}/following`)
+                .expect(401);
+        });
+
         it('200 retorna lista de siguiendo', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/${userAUsername}/following`)
+                .set('Authorization', `Bearer ${userAToken}`)
                 .expect(200);
 
             expect(Array.isArray(res.body)).toBe(true);
             expect(res.body.length).toBe(1);
         });
 
-        it('cada item tiene los campos correctos', async () => {
+        it('cada item tiene los campos correctos incluyendo isFollowing', async () => {
             const res = await request(app.getHttpServer())
                 .get(`/api/users/${userAUsername}/following`)
+                .set('Authorization', `Bearer ${userAToken}`)
                 .expect(200);
 
             const following = res.body[0];
@@ -209,6 +228,7 @@ describe('Follows (integration)', () => {
             expect(following).toHaveProperty('username');
             expect(following).toHaveProperty('displayName');
             expect(following).toHaveProperty('avatarUrl');
+            expect(following).toHaveProperty('isFollowing');
             expect(following).not.toHaveProperty('password');
             expect(following).not.toHaveProperty('email');
             expect(following).not.toHaveProperty('isActive');
@@ -217,6 +237,7 @@ describe('Follows (integration)', () => {
         it('404 si el username no existe', async () => {
             await request(app.getHttpServer())
                 .get('/api/users/nonexistentuser9999/following')
+                .set('Authorization', `Bearer ${userAToken}`)
                 .expect(404);
         });
     });
