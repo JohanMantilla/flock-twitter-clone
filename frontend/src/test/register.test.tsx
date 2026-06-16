@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useAuth', () => ({
     useAuth: () => ({
         register: async (email: string, password: string, username: string) => {
-            const res = await fetch('http://localhost:3000/api/auth/register', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password, username }),
@@ -24,6 +24,7 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 import RegisterPage from '@/app/(auth)/register/page';
+import { API_BASE_URL } from '@/constants/api';
 
 describe('Register page', () => {
     it('renders all fields', () => {

@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '@/constants/api';
 import { http, HttpResponse } from 'msw';
 
 const mockUser = {
@@ -10,23 +11,23 @@ const mockUser = {
 };
 
 export const handlers = [
-    http.post('http://localhost:3000/api/auth/login', () => {
+    http.post(`${API_BASE_URL}/api/auth/login`, () => {
         return HttpResponse.json({ user: mockUser, token: 'mock-token' });
     }),
 
-    http.post('http://localhost:3000/api/auth/register', () => {
+    http.post(`${API_BASE_URL}/api/auth/register`, () => {
         return HttpResponse.json({ user: mockUser, token: 'mock-token' });
     }),
 
-    http.get('http://localhost:3000/api/auth/me', () => {
+    http.get(`${API_BASE_URL}/api/auth/me`, () => {
         return HttpResponse.json(mockUser);
     }),
 
-    http.get('http://localhost:3000/api/tweets/timeline', () => {
+    http.get(`${API_BASE_URL}/api/tweets/timeline`, () => {
         return HttpResponse.json({ data: [], nextCursor: null, hasMore: false });
     }),
 
-    http.post('http://localhost:3000/api/tweets', () => {
+    http.post(`${API_BASE_URL}/api/tweets`, () => {
         return HttpResponse.json({
             id: 'tweet-uuid-1',
             content: 'Hello world',
@@ -36,11 +37,11 @@ export const handlers = [
         });
     }),
 
-    http.post('http://localhost:3000/api/tweets/:id/like', () => {
+    http.post(`${API_BASE_URL}/api/tweets/:id/like`, () => {
         return HttpResponse.json({ likesCount: 1 });
     }),
 
-    http.post('http://localhost:3000/api/users/:username/follow', () => {
+    http.post(`${API_BASE_URL}/api/users/:username/follow`, () => {
         return HttpResponse.json({ success: true, following: true });
     }),
 ];

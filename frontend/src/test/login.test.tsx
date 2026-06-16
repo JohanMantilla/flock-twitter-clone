@@ -14,7 +14,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useAuth', () => ({
     useAuth: () => ({
         login: async (email: string, password: string) => {
-            const res = await fetch('http://localhost:3000/api/auth/login', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -26,6 +26,7 @@ vi.mock('@/hooks/useAuth', () => ({
 }));
 
 import LoginPage from '@/app/(auth)/login/page';
+import { API_BASE_URL } from '@/constants/api';
 
 describe('Login page', () => {
     it('renders email and password fields', () => {
@@ -68,7 +69,7 @@ describe('Login page', () => {
 
     it('shows error message on invalid credentials', async () => {
         server.use(
-            http.post('http://localhost:3000/api/auth/login', () => {
+            http.post(`${API_BASE_URL}/api/auth/login`, () => {
                 return HttpResponse.json(
                     { message: 'Invalid credentials' },
                     { status: 401 },
@@ -90,7 +91,7 @@ describe('Login page', () => {
 
     it('button shows loading state while submitting', async () => {
         server.use(
-            http.post('http://localhost:3000/api/auth/login', async () => {
+            http.post(`${API_BASE_URL}/api/auth/login`, async () => {
                 await new Promise(r => setTimeout(r, 100));
                 return HttpResponse.json({ user: {}, token: 'tok' });
             }),
