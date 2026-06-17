@@ -147,7 +147,7 @@ async function seed() {
     console.log(`   Likes:   ${likeCount}`);
     console.log('\n Example credentials:');
     console.log(`   Email:    ${users[0].email}`);
-    console.log(`   Password: Password123`);
+    console.log(`   Password: Password1`);
 
     await queryRunner.release();
     await AppDataSource.destroy();
