@@ -10,7 +10,7 @@ async function bootstrap() {
   const port = configService.get<number>('port') ?? 3000;
 
   app.enableCors({
-    origin: 'http://localhost:3001', // puerto de Next.js
+    origin: 'http://localhost:3001',
     credentials: true,
   });
 

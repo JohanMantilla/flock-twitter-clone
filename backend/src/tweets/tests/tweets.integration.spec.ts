@@ -398,7 +398,6 @@ describe('Tweets (integration)', () => {
                 [timelineUserAId]
             );
 
-            // usar SQL directo en lugar de Promise.all para evitar requests en vuelo
             for (let i = 0; i < 60; i++) {
                 await dataSource.query(
                     `INSERT INTO tweets (id, user_id, content, likes_count, created_at, updated_at)

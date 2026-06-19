@@ -140,8 +140,8 @@ describe('FollowsService', () => {
             ];
 
             mockQueryBuilder.getMany
-                .mockResolvedValueOnce(mockFollows) // getFollowers query
-                .mockResolvedValueOnce([]);          // getMyFollowingIdsAmong query
+                .mockResolvedValueOnce(mockFollows)
+                .mockResolvedValueOnce([]);
 
             const result = await service.getFollowers('target', 'user-id');
 

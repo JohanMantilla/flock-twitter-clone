@@ -26,7 +26,6 @@ describe('Search (integration)', () => {
 
         await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@search-test.com'`);
 
-        // usuario que hace las búsquedas
         const searcherRes = await request(app.getHttpServer())
             .post('/api/auth/register')
             .send({

@@ -20,14 +20,13 @@ export function FollowButton({
     const [hovering, setHovering] = useState(false);
     const { follow, unfollow } = useFollow(username);
 
-    // no mostrar si no hay usuario autenticado o es el mismo usuario
     if (!currentUserId || currentUserId === targetUserId) return null;
 
     const isPending = follow.isPending || unfollow.isPending;
 
     const handleClick = async () => {
         const prev = following;
-        setFollowing(f => !f); // optimistic
+        setFollowing(f => !f);
 
         try {
             if (prev) {
@@ -36,7 +35,7 @@ export function FollowButton({
                 await follow.mutateAsync();
             }
         } catch (err: any) {
-            setFollowing(prev); // revert on error
+            setFollowing(prev);
             console.error('Follow error:', err?.response?.data);
         }
     };
@@ -54,10 +53,10 @@ export function FollowButton({
             onMouseLeave={() => setHovering(false)}
             disabled={isPending}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors disabled:opacity-50 min-w-[90px] ${following
-                    ? hovering
-                        ? 'border border-red-200 text-red-500 bg-red-50'
-                        : 'border border-gray-200 text-gray-700 bg-white'
-                    : 'bg-gray-900 text-white hover:bg-gray-700'
+                ? hovering
+                    ? 'border border-red-200 text-red-500 bg-red-50'
+                    : 'border border-gray-200 text-gray-700 bg-white'
+                : 'bg-gray-900 text-white hover:bg-gray-700'
                 }`}
         >
             {label}
