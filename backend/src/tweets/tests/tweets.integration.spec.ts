@@ -61,16 +61,37 @@ describe('Tweets (integration)', () => {
     });
 
     afterAll(async () => {
-        await dataSource.query(
-            `DELETE FROM likes WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')`
-        );
-        await dataSource.query(
-            `DELETE FROM follows WHERE follower_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com') OR following_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')`
-        );
-        await dataSource.query(
-            `DELETE FROM tweets WHERE user_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')`
-        );
-        await dataSource.query(`DELETE FROM "user" WHERE email LIKE '%@tweets-test.com'`);
+        // esperar un tick para que requests en vuelo terminen
+        await new Promise(r => setTimeout(r, 500));
+
+        // borrar en orden correcto respetando FK
+        // likes que referencian tweets de usuarios de test
+        await dataSource.query(`
+        DELETE FROM likes
+        WHERE tweet_id IN (
+            SELECT id FROM tweets
+            WHERE user_id IN (
+                SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com'
+            )
+        )
+        OR user_id IN (
+            SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com'
+        )
+    `);
+        await dataSource.query(`
+        DELETE FROM follows
+        WHERE follower_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')
+        OR following_id IN (SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com')
+    `);
+        await dataSource.query(`
+        DELETE FROM tweets
+        WHERE user_id IN (
+            SELECT id FROM "user" WHERE email LIKE '%@tweets-test.com'
+        )
+    `);
+        await dataSource.query(`
+        DELETE FROM "user" WHERE email LIKE '%@tweets-test.com'
+    `);
         await app.close();
     });
 
@@ -369,6 +390,7 @@ describe('Tweets (integration)', () => {
             expect(limited.body.data.length).toBeLessThanOrEqual(5);
         });
 
+
         it('clamps limit to max 50', async () => {
             await ensureFollow();
             await dataSource.query(
@@ -376,16 +398,16 @@ describe('Tweets (integration)', () => {
                 [timelineUserAId]
             );
 
-            const p2: Promise<any>[] = [];
+            // usar SQL directo en lugar de Promise.all para evitar requests en vuelo
             for (let i = 0; i < 60; i++) {
-                p2.push(
-                    request(app.getHttpServer())
-                        .post('/api/tweets')
-                        .set('Authorization', `Bearer ${timelineUserAToken}`)
-                        .send({ content: `big-${i}` }),
+                await dataSource.query(
+                    `INSERT INTO tweets (id, user_id, content, likes_count, created_at, updated_at)
+             VALUES (gen_random_uuid(), $1, $2, 0,
+             NOW() - ($3 * INTERVAL '1 second'),
+             NOW() - ($3 * INTERVAL '1 second'))`,
+                    [timelineUserAId, `big-${i}`, 60 - i]
                 );
             }
-            await Promise.all(p2);
 
             const big = await request(app.getHttpServer())
                 .get('/api/tweets/timeline?limit=100')
@@ -394,6 +416,7 @@ describe('Tweets (integration)', () => {
 
             expect(big.body.data.length).toBeLessThanOrEqual(50);
         });
+
     });
 
 });
